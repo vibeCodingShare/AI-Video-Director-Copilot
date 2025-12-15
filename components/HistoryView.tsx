@@ -49,8 +49,8 @@ const HistoryView: React.FC<HistoryViewProps> = ({ currentView, setView }) => {
   };
 
   return (
-    <aside className="w-72 bg-surface/50 border-r border-gray-800 flex flex-col shrink-0">
-      <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+    <div className="flex flex-col h-full w-full">
+      <div className="p-4 border-b border-gray-800 flex justify-between items-center shrink-0">
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">History</h3>
         <div className="flex gap-2">
             <button 
@@ -114,7 +114,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ currentView, setView }) => {
           );
         })}
       </div>
-    </aside>
+    </div>
   );
 };
 

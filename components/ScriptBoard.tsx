@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../store/AppContext';
 import SceneCard from './SceneCard';
@@ -85,8 +86,8 @@ const ScriptBoard: React.FC = () => {
         ))}
       </div>
 
-      {/* Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-20">
+      {/* Grid - Smart Responsive Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6 pb-20">
         {filteredScenes.map(scene => (
           <div key={scene.id} className="min-h-[400px]">
             <SceneCard scene={scene} onUpdate={handleSceneUpdate} />
