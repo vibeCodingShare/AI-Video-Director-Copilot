@@ -1,3 +1,4 @@
+
 import { ProjectInput } from '../types';
 
 export const buildScriptGenerationPrompt = (input: ProjectInput): string => {
@@ -17,6 +18,13 @@ ${input.additionalPrompt}
 Task:
 Convert the raw content into a video script JSON.
 Calculate the duration of each scene carefully to match the total target duration.
+
+**CRITICAL VISUAL RULES (STRICT COMPLIANCE REQUIRED):**
+1. **NO "Talking Head" Marathons**: Do not create a script that is 100% "A-Roll". This is a failure.
+2. **Screencasts**: If the content mentions a software feature, UI, website, app, or digital step, the scene type MUST be "Screencast". The visual description must describe the cursor movement, click, or UI change.
+3. **B-Roll**: If the content is metaphorical, setting a scene, or showing a physical reaction, use "B-Roll".
+4. **Diversity**: You must alternate between A-Roll and other types. A good ratio is 30% A-Roll, 70% Visuals (B-Roll/Screencast/Infographic).
+
 The output MUST be a valid JSON object matching the following structure exactly:
 
 {
@@ -29,12 +37,12 @@ The output MUST be a valid JSON object matching the following structure exactly:
       "script": "Spoken words or visual description if no speech",
       "emotion": "Tone of the scene",
       "visual_spec": {
-        "description": "Visual description",
+        "description": "Visual description. If Screencast, describe the UI action.",
         "shot_size": "Wide" | "Medium" | "Close-up" etc,
         "camera_move": "Static" | "Pan" etc,
         "lighting": "Natural" | "Softbox" etc
       },
-      "image_prompt": "A detailed English prompt to generate a storyboard image for this scene",
+      "image_prompt": "A detailed English prompt to generate a storyboard image for this scene. If Screencast, describe the UI layout.",
       "editing_note": "Any specific editing instruction"
     }
   ]

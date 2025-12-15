@@ -35,11 +35,17 @@ Goal: Convert requirements into a professional shooting script JSON.
 # GLOBAL CONSTRAINTS
 1. **LANGUAGE**: The 'script', 'visual_spec.description', and 'emotion' fields in the output JSON **MUST BE IN CHINESE (SIMPLIFIED)**.
 2. **FORMAT**: You must strictly output valid JSON matching the defined schema.
+3. **VISUAL DIVERSITY**: Do not create a "talking head" video. Use A-Roll sparingly. Show, don't just tell.
 `;
 
 const DEFAULT_VAR_STORYBOARD = `
-- Categorize every scene accurately (A-Roll for speaking, B-Roll for context, Screencast for demos).
-- Visual Presentation: Ensure the visual content matches the spoken audio. If the audio is abstract, provide concrete visual metaphors.
+- **MANDATORY CATEGORIZATION RULES**:
+  1. **Screencast**: IF the script describes software, websites, app interfaces, code, or digital workflows, the Scene Type MUST be 'Screencast'.
+  2. **Infographic**: IF the script discusses data, numbers, charts, or abstract concepts requiring visualization, the Scene Type MUST be 'Infographic'.
+  3. **B-Roll**: IF the script describes an environment, a physical product close-up, or a mood shot without the speaker talking directly to camera, use 'B-Roll'.
+  4. **A-Roll**: ONLY use 'A-Roll' when the speaker needs to establish an emotional connection or intro/outro the video.
+
+- **Scene Pacing**: Avoid more than 2 consecutive 'A-Roll' scenes. Break them up with visuals (B-Roll/Screencast) while the voiceover continues.
 `;
 
 const DEFAULT_VAR_CINEMATOGRAPHY = `

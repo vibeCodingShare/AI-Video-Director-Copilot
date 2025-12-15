@@ -42,7 +42,7 @@ const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate }) => {
       });
     } catch (error: any) {
       if (error.message.includes("No active image model")) {
-          alert("Please configure an Image Generation Model (Google, Jimeng 4, or OpenAI) in the Settings tab first.");
+          alert("Please configure an Image Generation Model (Google, Jimeng 4, Kling AI, or OpenAI) in the Settings tab first.");
       } else {
           alert(`Failed to generate image: ${error.message || 'Unknown error'}`);
       }
@@ -98,21 +98,19 @@ const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate }) => {
       
         {/* Image Section */}
         <div className="mt-auto space-y-2">
-          {/* Style Selector */}
-          {!scene.generated_image_url && (
-            <div className="flex items-center gap-2">
-               <Palette size={14} className="text-gray-500" />
-               <select 
-                value={selectedStyleId}
-                onChange={(e) => setSelectedStyleId(e.target.value)}
-                className="bg-black/40 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 w-full focus:outline-none focus:border-primary"
-               >
-                   {settings.imageStyleTemplates.map(t => (
-                       <option key={t.id} value={t.id}>{t.name}</option>
-                   ))}
-               </select>
-            </div>
-          )}
+          {/* Style Selector - Always visible */}
+          <div className="flex items-center gap-2">
+             <Palette size={14} className="text-gray-500" />
+             <select 
+              value={selectedStyleId}
+              onChange={(e) => setSelectedStyleId(e.target.value)}
+              className="bg-black/40 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 w-full focus:outline-none focus:border-primary"
+             >
+                 {settings.imageStyleTemplates.map(t => (
+                     <option key={t.id} value={t.id}>{t.name}</option>
+                 ))}
+             </select>
+          </div>
 
           {scene.generated_image_url ? (
             <div className="relative group rounded-lg overflow-hidden border border-gray-700 aspect-video bg-black">
