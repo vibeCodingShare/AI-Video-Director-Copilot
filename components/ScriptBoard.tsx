@@ -7,7 +7,7 @@ import { SCENE_TYPE_LABELS, SCENE_TYPE_COLORS } from '../constants';
 import { Filter, Download, AlertTriangle } from 'lucide-react';
 
 const ScriptBoard: React.FC = () => {
-  const { getCurrentProject, updateScene, storageError } = useAppStore();
+  const { getCurrentProject, updateScene, updateProject, storageError } = useAppStore();
   const project = getCurrentProject();
   const [filterType, setFilterType] = useState<SceneType | 'ALL'>('ALL');
 
@@ -22,6 +22,18 @@ const ScriptBoard: React.FC = () => {
   const handleSceneUpdate = (updatedFields: Partial<Scene> & { id: number }) => {
     if (!project) return;
     updateScene(project.id, updatedFields.id, updatedFields);
+  };
+
+  const handleDeleteScene = (sceneId: number) => {
+    if (!project || !project.data) return;
+    if (confirm("Are you sure you want to delete this scene?")) {
+        const newScenes = project.data.scenes.filter(s => s.id !== sceneId);
+        updateProject(project.id, {
+            data: { ...project.data, scenes: newScenes },
+            // Invalidate the editing plan as scene references might be broken
+            editingPlan: undefined
+        });
+    }
   };
 
   const exportJSON = () => {
@@ -90,7 +102,11 @@ const ScriptBoard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-6 pb-20">
         {filteredScenes.map(scene => (
           <div key={scene.id} className="min-h-[400px]">
-            <SceneCard scene={scene} onUpdate={handleSceneUpdate} />
+            <SceneCard 
+              scene={scene} 
+              onUpdate={handleSceneUpdate} 
+              onDelete={handleDeleteScene} 
+            />
           </div>
         ))}
       </div>

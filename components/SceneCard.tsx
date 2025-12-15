@@ -2,15 +2,16 @@
 import React, { useState } from 'react';
 import { Scene } from '../types';
 import { SCENE_TYPE_COLORS, SCENE_TYPE_LABELS } from '../constants';
-import { Image as ImageIcon, RefreshCw, Clock, Camera, Film, Lightbulb, Zap, Palette } from 'lucide-react';
+import { Image as ImageIcon, RefreshCw, Clock, Camera, Film, Lightbulb, Zap, Palette, Trash2 } from 'lucide-react';
 import { useAppStore } from '../store/AppContext';
 
 interface SceneCardProps {
   scene: Scene;
   onUpdate: (updatedFields: Partial<Scene> & { id: number }) => void;
+  onDelete: (id: number) => void;
 }
 
-const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate }) => {
+const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate, onDelete }) => {
   const { settings, taskState, startSceneImageGeneration, currentProjectId } = useAppStore();
   
   // Default to first template or a blank string
@@ -30,13 +31,28 @@ const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate }) => {
   const badgeColor = SCENE_TYPE_COLORS[scene.type] || 'bg-gray-800 border-gray-700 text-gray-300';
 
   return (
-    <div className="bg-surface rounded-xl border border-gray-800 overflow-hidden hover:border-gray-600 transition-all duration-300 flex flex-col h-full">
+    <div className="bg-surface rounded-xl border border-gray-800 overflow-hidden hover:border-gray-600 transition-all duration-300 flex flex-col h-full group/card">
       {/* Header */}
       <div className={`px-4 py-2 flex justify-between items-center text-xs font-semibold uppercase tracking-wider border-b border-black/20 ${badgeColor}`}>
-        <span>{SCENE_TYPE_LABELS[scene.type]}</span>
-        <div className="flex items-center gap-1 opacity-80">
-          <Clock size={12} />
-          {scene.duration_sec}s
+        <div className="flex items-center gap-2 truncate mr-2">
+            <span className="bg-black/20 px-1.5 py-0.5 rounded text-[10px] font-mono opacity-90 border border-white/10">#{scene.id}</span>
+            <span className="truncate">{SCENE_TYPE_LABELS[scene.type]}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 opacity-80">
+            <Clock size={12} />
+            {scene.duration_sec}s
+          </div>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(scene.id);
+            }}
+            className="opacity-60 hover:opacity-100 hover:text-red-200 transition-opacity p-1 -mr-1 rounded"
+            title="Delete Scene"
+          >
+            <Trash2 size={14} />
+          </button>
         </div>
       </div>
 
