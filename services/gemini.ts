@@ -41,7 +41,7 @@ const callGoogleGenAI = async (
 const callOpenAICompatible = async (
   config: ModelConfig, 
   prompt: string, 
-  systemInstruction?: string,
+  systemInstruction?: string, 
   jsonMode: boolean = false
 ): Promise<string> => {
   if (!config.apiKey) throw new Error(`API Key missing for ${config.name}`);
@@ -100,6 +100,7 @@ const generateText = async (
   if (config.provider === 'google') {
     return callGoogleGenAI(config, prompt, systemInstruction, jsonMode);
   } else {
+    // OpenAI and Jimeng (if used for text) fallback to compatible
     return callOpenAICompatible(config, prompt, systemInstruction, jsonMode);
   }
 };
@@ -149,7 +150,7 @@ const callOpenAICompatibleImageGen = async (config: ModelConfig, prompt: string)
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`OpenAI Image API Error: ${err}`);
+      throw new Error(`Image Gen API Error: ${err}`);
     }
 
     const data = await response.json();
@@ -163,9 +164,84 @@ const callOpenAICompatibleImageGen = async (config: ModelConfig, prompt: string)
 
     throw new Error("No image data found in response");
   } catch (e) {
-    console.error("OpenAI Image Gen Failed", e);
+    console.error("Image Gen Failed", e);
     throw e;
   }
+};
+
+const callKlingImageGen = async (config: ModelConfig, prompt: string): Promise<string> => {
+    if (!config.apiKey) throw new Error(`API Key missing for ${config.name}`);
+    const baseUrl = config.baseUrl?.replace(/\/+$/, '') || 'https://api.klingai.com/v1';
+  
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`
+    };
+  
+    // 1. Submit Task
+    // Kling typically uses /images/generations for submission, returning a Task ID
+    const submitRes = await fetch(`${baseUrl}/images/generations`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: config.modelId || 'kling-v1',
+        prompt: prompt,
+        n: 1
+      })
+    });
+  
+    if (!submitRes.ok) {
+       const txt = await submitRes.text();
+       throw new Error(`Kling Submit Failed: ${txt}`);
+    }
+  
+    const submitData = await submitRes.json();
+    
+    // Check if it returned image directly (Standard/Sync mode fallback)
+    if (submitData.data && Array.isArray(submitData.data) && (submitData.data[0]?.url || submitData.data[0]?.b64_json)) {
+        if (submitData.data[0].b64_json) return `data:image/png;base64,${submitData.data[0].b64_json}`;
+        return submitData.data[0].url;
+    }
+    
+    // Async Task Flow
+    // Kling response usually wraps data in a 'data' field, and task_id inside it
+    const taskId = submitData.data?.task_id || submitData.task_id;
+    if (!taskId) {
+        // Just in case the structure is very different
+        console.error("Kling Response:", submitData);
+        throw new Error(`No task_id or image data found in Kling response.`);
+    }
+  
+    // 2. Poll Status
+    let attempts = 0;
+    const MAX_ATTEMPTS = 45; // 90 seconds max
+    
+    while (attempts < MAX_ATTEMPTS) {
+        await new Promise(r => setTimeout(r, 2000)); // Wait 2s
+        attempts++;
+  
+        const checkRes = await fetch(`${baseUrl}/images/generations/${taskId}`, {
+            headers
+        });
+        
+        if (!checkRes.ok) continue;
+  
+        const checkData = await checkRes.json();
+        const statusData = checkData.data || checkData; // Handle wrapped or unwrapped data
+        const status = statusData.task_status || statusData.status;
+        
+        if (status === 'succeed' || status === 'completed' || status === 'success') {
+            const result = statusData.task_result || statusData.result;
+            const images = result?.images;
+            if (images && images[0]?.url) {
+                return images[0].url;
+            }
+        } else if (status === 'failed' || status === 'failure') {
+            throw new Error(`Kling Task Failed: ${statusData.task_status_msg || 'Unknown error'}`);
+        }
+    }
+  
+    throw new Error("Kling Generation Timed Out");
 };
 
 // --- EXPORTED FUNCTIONS ---
@@ -199,7 +275,7 @@ export const generateScript = async (
   // If using OpenAI compatible models, we append "Respond in JSON" explicitly to prompt to be safe, 
   // although json_object mode helps.
   const config = getActiveTextConfig(settings);
-  if (config?.provider === 'openai-compatible') {
+  if (config?.provider === 'openai-compatible' || config?.provider === 'jimeng') {
       systemInstruction += "\n\nIMPORTANT: You must respond with raw JSON only. No markdown formatting.";
   }
 
@@ -231,17 +307,24 @@ export const generateSceneImage = async (
   fullPrompt += ` Detail: ${imagePrompt}`;
 
   const config = getActiveImageConfig(settings);
-  if (!config) return `https://picsum.photos/seed/${Math.random()}/800/450`;
+  if (!config) {
+      throw new Error("No active image model configured. Please check Settings.");
+  }
 
   try {
     if (config.provider === 'google') {
       return await callGoogleImageGen(config, fullPrompt);
+    } else if (config.provider === 'jimeng') {
+      // Jimeng 4 on Ark/Doubao Platform supports standard OpenAI 'images/generations' interface.
+      return await callOpenAICompatibleImageGen(config, fullPrompt);
+    } else if (config.provider === 'kling') {
+      return await callKlingImageGen(config, fullPrompt);
     } else {
       return await callOpenAICompatibleImageGen(config, fullPrompt);
     }
   } catch (error) {
     console.error("Image generation error:", error);
-    return `https://picsum.photos/seed/${Math.random()}/800/450`; 
+    throw error;
   }
 };
 

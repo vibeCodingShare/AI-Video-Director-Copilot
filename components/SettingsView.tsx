@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAppStore } from '../store/AppContext';
-import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key } from 'lucide-react';
+import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key, ExternalLink } from 'lucide-react';
 import { DEFAULT_SETTINGS } from '../constants';
 import { ImageStyleTemplate, ModelConfig, ModelProvider } from '../types';
 
@@ -74,10 +74,31 @@ const SettingsView: React.FC = () => {
 
   const updateModelConfig = (type: 'text' | 'image', id: string, updates: Partial<ModelConfig>) => {
     const listKey = type === 'text' ? 'textModels' : 'imageModels';
-    setLocalSettings(prev => ({
-      ...prev,
-      [listKey]: prev[listKey].map(m => m.id === id ? { ...m, ...updates } : m)
-    }));
+    setLocalSettings(prev => {
+      const updatedModels = prev[listKey].map(m => {
+        if (m.id !== id) return m;
+        
+        const updatedModel = { ...m, ...updates };
+        
+        // Auto-fill defaults
+        if (updates.provider === 'jimeng' && m.provider !== 'jimeng') {
+            updatedModel.baseUrl = 'https://ark.cn-beijing.volces.com/api/v3';
+            if (!updatedModel.name.includes('Jimeng')) updatedModel.name = 'Jimeng 4 (Volcengine)';
+        }
+        if (updates.provider === 'kling' && m.provider !== 'kling') {
+            updatedModel.baseUrl = 'https://api.klingai.com/v1';
+            updatedModel.modelId = 'kling-v1';
+            if (!updatedModel.name.includes('Kling')) updatedModel.name = 'Kling AI (可灵)';
+        }
+        
+        return updatedModel;
+      });
+
+      return {
+        ...prev,
+        [listKey]: updatedModels
+      };
+    });
   };
 
   const deleteModelConfig = (type: 'text' | 'image', id: string) => {
@@ -143,20 +164,22 @@ const SettingsView: React.FC = () => {
                         onChange={e => updateModelConfig(type, config.id, { provider: e.target.value as ModelProvider })}
                      >
                          <option value="google">Google GenAI</option>
-                         <option value="openai-compatible">OpenAI Compatible (ChatGPT, DeepSeek, Qianwen)</option>
+                         <option value="openai-compatible">OpenAI Compatible (ChatGPT, DeepSeek)</option>
+                         <option value="jimeng">Volcengine Jimeng 4 (Ark/Doubao)</option>
+                         <option value="kling">Kling AI (可灵)</option>
                      </select>
                 </div>
                 <div>
-                    <label className="text-xs text-gray-500 block mb-1">Model ID (e.g. gpt-4, gemini-2.5-flash)</label>
+                    <label className="text-xs text-gray-500 block mb-1">Model ID (e.g. kling-v1, gpt-4...)</label>
                     <input 
                         className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white"
-                        placeholder="Model ID string"
+                        placeholder="Model ID"
                         value={config.modelId}
                         onChange={e => updateModelConfig(type, config.id, { modelId: e.target.value })}
                     />
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                     <label className="text-xs text-gray-500 block mb-1">API Key</label>
+                     <label className="text-xs text-gray-500 block mb-1">API Key / Bearer Token</label>
                      <div className="relative">
                         <Key size={14} className="absolute left-2.5 top-2.5 text-gray-500" />
                         <input 
@@ -168,16 +191,29 @@ const SettingsView: React.FC = () => {
                         />
                      </div>
                 </div>
-                {config.provider === 'openai-compatible' && (
+                {(config.provider === 'openai-compatible' || config.provider === 'jimeng' || config.provider === 'kling') && (
                      <div className="col-span-1 md:col-span-2">
-                        <label className="text-xs text-gray-500 block mb-1">Base URL (Optional)</label>
+                        <label className="text-xs text-gray-500 block mb-1">Base URL</label>
                         <input 
                             className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-gray-300 font-mono"
-                            placeholder="https://api.openai.com/v1"
+                            placeholder="https://..."
                             value={config.baseUrl || ''}
                             onChange={e => updateModelConfig(type, config.id, { baseUrl: e.target.value })}
                         />
-                         <p className="text-[10px] text-gray-500 mt-1">E.g. https://api.deepseek.com/v1 or https://dashscope.aliyuncs.com/compatible-mode/v1</p>
+                         <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2">
+                             {config.provider === 'jimeng' && (
+                                <span className="text-primary flex items-center gap-1">
+                                    Recommended: https://ark.cn-beijing.volces.com/api/v3 
+                                    <a href="https://www.volcengine.com/docs/85621/1820192?lang=zh" target="_blank" rel="noreferrer" className="underline flex items-center"><ExternalLink size={10} /> Docs</a>
+                                </span>
+                             )}
+                             {config.provider === 'kling' && (
+                                <span className="text-primary flex items-center gap-1">
+                                    Recommended: https://api.klingai.com/v1
+                                    <a href="https://app.klingai.com/cn/dev/document-api/apiReference/model/imageGeneration" target="_blank" rel="noreferrer" className="underline flex items-center"><ExternalLink size={10} /> Docs</a>
+                                </span>
+                             )}
+                         </div>
                     </div>
                 )}
             </div>
@@ -277,7 +313,7 @@ const SettingsView: React.FC = () => {
                 <div className="max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="bg-blue-900/20 border border-blue-800 p-4 rounded-lg text-sm text-blue-200 mb-6">
                         <h3 className="font-bold flex items-center gap-2 mb-1"><CheckCircle size={16} /> Bring Your Own Key (BYOK)</h3>
-                        <p>Configure multiple AI providers here. The selected "Active" model will be used for all operations. Supports Google Gemini and any OpenAI-compatible API (DeepSeek, Qianwen, etc).</p>
+                        <p>Configure multiple AI providers here. The selected "Active" model will be used for all operations. Supports Google Gemini, Jimeng 4, Kling AI, and any OpenAI-compatible API.</p>
                     </div>
 
                     {/* Text Models */}

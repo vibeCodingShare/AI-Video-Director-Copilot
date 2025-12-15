@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Scene, VisualSpec } from '../types';
 import { SCENE_TYPE_COLORS, SCENE_TYPE_LABELS } from '../constants';
-import { Image as ImageIcon, RefreshCw, Clock, Camera, Film, Lightbulb, Zap, Palette } from 'lucide-react';
+import { Image as ImageIcon, RefreshCw, Clock, Camera, Film, Lightbulb, Zap, Palette, Settings } from 'lucide-react';
 import { generateSceneImage } from '../services/gemini';
 import { useAppStore } from '../store/AppContext';
 
@@ -40,8 +40,12 @@ const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate }) => {
           generated_image_url: imageUrl,
           image_style_preset: selectedStyleId
       });
-    } catch (error) {
-      alert("Failed to generate image. Please try again.");
+    } catch (error: any) {
+      if (error.message.includes("No active image model")) {
+          alert("Please configure an Image Generation Model (Google, Jimeng 4, or OpenAI) in the Settings tab first.");
+      } else {
+          alert(`Failed to generate image: ${error.message || 'Unknown error'}`);
+      }
     } finally {
       setIsGenerating(false);
     }

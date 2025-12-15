@@ -4,12 +4,17 @@ import { ProjectInput as IProjectInput, Project } from '../types';
 import { useAppStore } from '../store/AppContext';
 import { buildScriptGenerationPrompt } from '../utils/promptBuilder';
 import { generateScript, analyzeIntent } from '../services/gemini';
-import { Wand2, Loader2, FileText, User, Clock, MessageSquarePlus, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { Wand2, Loader2, FileText, User, Clock, MessageSquarePlus, Sparkles, Image as ImageIcon, CheckCircle, ArrowRight } from 'lucide-react';
 
-const ProjectInput: React.FC = () => {
+interface ProjectInputProps {
+  onSuccess?: () => void;
+}
+
+const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
   const { addProject, settings } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   
   // Initialize with first available template if exists
   const [input, setInput] = useState<IProjectInput>({
@@ -61,14 +66,42 @@ const ProjectInput: React.FC = () => {
         data: scriptData
       };
 
+      // Add to store immediately
       addProject(newProject);
+      
+      // Trigger Success Animation
+      setLoading(false);
+      setIsSuccess(true);
+
+      // Wait for animation then navigate
+      setTimeout(() => {
+          if (onSuccess) onSuccess();
+      }, 1500);
+
     } catch (err) {
       alert("Error generating script. Please check your API key or try again.");
       console.error(err);
-    } finally {
       setLoading(false);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500">
+        <div className="bg-surface border border-primary/30 p-10 rounded-2xl flex flex-col items-center shadow-2xl shadow-primary/20 max-w-md text-center">
+            <div className="mb-6 relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping"></div>
+              <CheckCircle size={64} className="text-primary relative z-10" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Script Generated!</h2>
+            <p className="text-gray-400 mb-6">The Director has finished the initial draft. Loading studio...</p>
+            <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
+                <div className="h-full bg-primary animate-[width_1.5s_ease-in-out_forwards] w-0"></div>
+            </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto py-8 px-4">
@@ -81,8 +114,16 @@ const ProjectInput: React.FC = () => {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-surface border border-gray-800 rounded-2xl p-8 shadow-xl space-y-6 relative">
+      <form onSubmit={handleSubmit} className="bg-surface border border-gray-800 rounded-2xl p-8 shadow-xl space-y-6 relative transition-opacity duration-300">
         
+        {loading && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 rounded-2xl flex flex-col items-center justify-center text-white">
+                <Loader2 size={48} className="animate-spin text-primary mb-4" />
+                <h3 className="text-xl font-bold">Writing Script...</h3>
+                <p className="text-gray-400 text-sm mt-2">The AI Director is analyzing your request</p>
+            </div>
+        )}
+
         {/* Title */}
         <div>
           <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
@@ -199,7 +240,7 @@ const ProjectInput: React.FC = () => {
             {loading ? (
               <>
                 <Loader2 className="animate-spin" />
-                Generating Script... (This might take a moment)
+                Generating Script...
               </>
             ) : (
               <>

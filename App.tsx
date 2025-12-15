@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { AppProvider, useAppStore } from './store/AppContext';
 import Layout from './components/Layout';
@@ -29,15 +30,13 @@ const AppContent: React.FC = () => {
      if (!currentProjectId && (view === 'script' || view === 'edit')) {
          setView('create');
      }
-     // If user just created a project (logic handled in ProjectInput usually), 
-     // but here we ensure if currentProjectId is set and we were in 'create', we switch to 'script'
-     // Wait, we don't want to force switch if user is navigating history.
-     // ProjectInput handles the switch on creation success.
   }, [currentProjectId]);
 
   return (
     <Layout view={view} setView={setView}>
-      {view === 'create' && <ProjectInput />}
+      {view === 'create' && (
+        <ProjectInput onSuccess={() => setView('script')} />
+      )}
       {view === 'settings' && <SettingsView />}
       
       {showProjectTabs && (

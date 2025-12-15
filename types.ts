@@ -93,7 +93,7 @@ export interface ImageStyleTemplate {
   prompt: string;
 }
 
-export type ModelProvider = 'google' | 'openai-compatible';
+export type ModelProvider = 'google' | 'openai-compatible' | 'jimeng' | 'kling';
 
 export interface ModelConfig {
   id: string;
