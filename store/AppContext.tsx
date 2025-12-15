@@ -1,9 +1,10 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { Project, AppSettings, Scene, ProjectInput, EditActionType, EditingPlan } from '../types';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Project, AppSettings, Scene, ProjectInput, EditingPlan } from '../types';
 import { DEFAULT_SETTINGS } from '../constants';
 import { analyzeIntent, generateScript, generateEditingPlan, generateSceneImage } from '../services/gemini';
 import { buildScriptGenerationPrompt, buildEditingPlanPrompt } from '../utils/promptBuilder';
+import { dbService } from '../services/db';
 
 interface TaskState {
   // Project Creation
@@ -23,6 +24,7 @@ interface AppState {
   currentProjectId: string | null;
   settings: AppSettings;
   taskState: TaskState; // Global Task State
+  isLoadingData: boolean;
   
   // Actions
   addProject: (project: Project) => void;
@@ -46,26 +48,12 @@ interface AppState {
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // --- Data Persistence ---
-  const [projects, setProjects] = useState<Project[]>(() => {
-    try {
-      const saved = localStorage.getItem('vdc_projects');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load projects", e);
-      return [];
-    }
-  });
+  // --- Data State ---
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    try {
-      const saved = localStorage.getItem('vdc_settings');
-      return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-    } catch (e) {
-      return DEFAULT_SETTINGS;
-    }
-  });
-
+  // --- Session State (Not persisted in DB) ---
   const [currentProjectId, setCurrentProjectIdState] = useState<string | null>(() => {
     return localStorage.getItem('vdc_currentProjectId') || null;
   });
@@ -81,22 +69,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     generatingImageIds: new Set(),
   });
 
-  // --- Persistence Effects ---
+  // --- Initialization Effect (Load from DB) ---
   useEffect(() => {
-    try {
-      localStorage.setItem('vdc_projects', JSON.stringify(projects));
-      setStorageError(null);
-    } catch (e: any) {
-      console.error("Storage Limit Exceeded:", e);
-      setStorageError("Storage limit reached. New changes may not persist if you reload. Consider exporting a backup or deleting old projects.");
-    }
-  }, [projects]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('vdc_settings', JSON.stringify(settings));
-    } catch (e) {}
-  }, [settings]);
+    const init = async () => {
+      try {
+        const [loadedProjects, loadedSettings] = await Promise.all([
+            dbService.getAllProjects(),
+            dbService.getSettings()
+        ]);
+        setProjects(loadedProjects);
+        setSettings(loadedSettings);
+      } catch (e) {
+        console.error("Failed to load data from IndexedDB:", e);
+        setStorageError("Failed to load database. Please refresh.");
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    init();
+  }, []);
 
   const setCurrentProjectId = (id: string | null) => {
     setCurrentProjectIdState(id);
@@ -107,53 +98,104 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // --- Synchronous Actions ---
+  // --- Actions with DB Persistence ---
 
-  const addProject = (project: Project) => {
+  const addProject = async (project: Project) => {
+    // Optimistic UI update
     setProjects(prev => [project, ...prev]);
     setCurrentProjectId(project.id);
+    // Async DB update
+    try {
+        await dbService.saveProject(project);
+    } catch (e) {
+        setStorageError("Failed to save project to disk.");
+    }
   };
 
-  const updateProject = (id: string, updates: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  const updateProject = async (id: string, updates: Partial<Project>) => {
+    // Find project to update for DB write
+    let updatedProjectFull: Project | undefined;
+
+    setProjects(prev => prev.map(p => {
+        if (p.id === id) {
+            updatedProjectFull = { ...p, ...updates };
+            return updatedProjectFull;
+        }
+        return p;
+    }));
+
+    if (updatedProjectFull) {
+        try {
+            await dbService.saveProject(updatedProjectFull);
+        } catch (e) {
+            console.error(e);
+            setStorageError("Failed to save changes.");
+        }
+    }
   };
 
-  const updateScene = (projectId: string, sceneId: number, updates: Partial<Scene>) => {
+  const updateScene = async (projectId: string, sceneId: number, updates: Partial<Scene>) => {
+    let updatedProjectFull: Project | undefined;
+
     setProjects(prev => prev.map(p => {
       if (p.id !== projectId || !p.data) return p;
       const newScenes = p.data.scenes.map(s => s.id === sceneId ? { ...s, ...updates } : s);
-      return { ...p, data: { ...p.data, scenes: newScenes } };
+      updatedProjectFull = { ...p, data: { ...p.data, scenes: newScenes } };
+      return updatedProjectFull;
     }));
+
+    if (updatedProjectFull) {
+        try {
+            await dbService.saveProject(updatedProjectFull);
+        } catch (e) {
+            console.error(e);
+            setStorageError("Failed to save scene changes.");
+        }
+    }
   };
 
-  const deleteProject = (id: string) => {
+  const deleteProject = async (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
     if (currentProjectId === id) setCurrentProjectId(null);
+    try {
+        await dbService.deleteProject(id);
+    } catch (e) {
+        console.error(e);
+    }
   };
 
-  const updateSettings = (newSettings: AppSettings) => {
+  const updateSettings = async (newSettings: AppSettings) => {
     setSettings(newSettings);
+    try {
+        await dbService.saveSettings(newSettings);
+    } catch (e) {
+        console.error(e);
+        setStorageError("Failed to save settings.");
+    }
   };
 
   const getCurrentProject = () => projects.find(p => p.id === currentProjectId);
 
-  const importProjects = (importedProjects: Project[]) => {
+  const importProjects = async (importedProjects: Project[]) => {
     if (!Array.isArray(importedProjects)) {
       alert("Invalid backup file format.");
       return;
     }
-    setProjects(prev => {
-        const projectMap = new Map(prev.map(p => [p.id, p]));
-        let added = 0; let updated = 0;
-        importedProjects.forEach(p => {
-            if (projectMap.has(p.id)) updated++; else added++;
-            projectMap.set(p.id, p);
-        });
-        setTimeout(() => alert(`Import Summary:\n• Added: ${added}\n• Updated: ${updated}`), 50);
-        return Array.from(projectMap.values()).sort((a, b) => b.createdAt - a.createdAt);
-    });
-    if (!currentProjectId && importedProjects.length > 0) {
-        setCurrentProjectId(importedProjects[0].id);
+    
+    try {
+        await dbService.importProjects(importedProjects);
+        // Reload from DB to ensure consistency
+        const freshProjects = await dbService.getAllProjects();
+        setProjects(freshProjects);
+
+        alert(`Import Successful! ${importedProjects.length} projects processed.`);
+        
+        if (!currentProjectId && freshProjects.length > 0) {
+            setCurrentProjectId(freshProjects[0].id);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Database import failed.");
     }
   };
 
@@ -197,7 +239,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         data: scriptData
       };
 
-      addProject(newProject);
+      await addProject(newProject);
       setTaskState(prev => ({ ...prev, isCreating: false, creationStatus: 'success' }));
 
     } catch (err: any) {
@@ -234,7 +276,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const prompt = buildEditingPlanPrompt(cleanProjectData);
       const plan = await generateEditingPlan(prompt, settings);
       
-      updateProject(projectId, { editingPlan: plan });
+      await updateProject(projectId, { editingPlan: plan });
 
     } catch (e: any) {
       console.error(e);
@@ -268,13 +310,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
          settings
        );
 
-       updateScene(projectId, scene.id, {
+       await updateScene(projectId, scene.id, {
            generated_image_url: imageUrl,
            image_style_preset: styleId
        });
 
     } catch (e: any) {
-        if (e.message.includes("No active image model")) {
+        if (e.message && e.message.includes("No active image model")) {
             alert("Please configure an Image Generation Model in Settings.");
         } else {
             console.error("Image Gen Failed:", e);
@@ -296,6 +338,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       settings,
       storageError,
       taskState,
+      isLoadingData,
       addProject,
       updateProject,
       updateScene,
@@ -309,7 +352,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       startEditPlanGeneration,
       startSceneImageGeneration
     }}>
-      {children}
+      {isLoadingData ? (
+          <div className="h-screen w-full flex items-center justify-center bg-background text-gray-500">
+              Loading Database...
+          </div>
+      ) : children}
     </AppContext.Provider>
   );
 };
