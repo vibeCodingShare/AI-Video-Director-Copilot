@@ -1,35 +1,22 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useAppStore } from '../store/AppContext';
-import { generateEditingPlan } from '../services/gemini';
-import { buildEditingPlanPrompt } from '../utils/promptBuilder';
 import { SCENE_TYPE_COLORS } from '../constants';
-import { PlayCircle, Wand2, Scissors, Music, Zap, ArrowRightLeft, Timer, Flame, AlertCircle } from 'lucide-react';
+import { PlayCircle, Wand2, Scissors, Music, ArrowRightLeft, Timer, Flame } from 'lucide-react';
 
 const EditingTimeline: React.FC = () => {
-  const { getCurrentProject, updateProject, settings } = useAppStore();
+  const { getCurrentProject, taskState, startEditPlanGeneration } = useAppStore();
   const project = getCurrentProject();
-  const [loading, setLoading] = useState(false);
-
+  
   if (!project || !project.data) {
     return <div className="text-center text-gray-500 mt-20">Please generate a script first.</div>;
   }
 
-  const handleGeneratePlan = async () => {
-    setLoading(true);
-    try {
-      const cleanScenes = project.data?.scenes.map(({ generated_image_url, ...rest }) => rest);
-      const cleanProjectData = { ...project.data, scenes: cleanScenes };
+  // Check global state
+  const isGenerating = taskState.generatingEditPlanIds.has(project.id);
 
-      const prompt = buildEditingPlanPrompt(cleanProjectData);
-      const plan = await generateEditingPlan(prompt, settings);
-      updateProject(project.id, { editingPlan: plan });
-    } catch (e) {
-      console.error(e);
-      alert("Failed to generate editing plan. Please check the console for details.");
-    } finally {
-      setLoading(false);
-    }
+  const handleGeneratePlan = () => {
+     startEditPlanGeneration(project.id);
   };
 
   const plan = project.editingPlan;
@@ -44,25 +31,25 @@ const EditingTimeline: React.FC = () => {
         {!plan && (
              <button
              onClick={handleGeneratePlan}
-             disabled={loading}
-             className="bg-accent hover:bg-amber-600 text-black font-bold py-2 px-6 rounded-lg flex items-center gap-2 transition-all"
+             disabled={isGenerating}
+             className="bg-accent hover:bg-amber-600 text-black font-bold py-2 px-6 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
            >
-             {loading ? <Wand2 className="animate-spin" /> : <Flame />}
-             Generate Viral Cut
+             {isGenerating ? <Wand2 className="animate-spin" /> : <Flame />}
+             {isGenerating ? 'Analyzing...' : 'Generate Viral Cut'}
            </button>
         )}
         {plan && (
              <button
              onClick={handleGeneratePlan}
-             disabled={loading}
-             className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+             disabled={isGenerating}
+             className="text-xs text-gray-400 hover:text-white flex items-center gap-1 disabled:opacity-50"
            >
-             <Wand2 size={12}/> Regenerate
+             <Wand2 size={12} className={isGenerating ? "animate-spin" : ""}/> Regenerate
            </button>
         )}
       </div>
 
-      {!plan ? (
+      {!plan && !isGenerating ? (
         <div className="flex-1 flex flex-col items-center justify-center bg-surface rounded-xl border border-gray-800 p-12 text-center">
             <div className="bg-gray-900 p-6 rounded-full mb-6 relative group">
                 <div className="absolute inset-0 bg-accent/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -74,8 +61,13 @@ const EditingTimeline: React.FC = () => {
                 <br/><span className="text-accent text-sm mt-2 inline-block">Warning: This is not a linear assembly.</span>
             </p>
         </div>
+      ) : isGenerating && !plan ? (
+        <div className="flex-1 flex flex-col items-center justify-center bg-surface rounded-xl border border-gray-800 p-12 text-center animate-pulse">
+            <Wand2 size={48} className="text-accent animate-spin mb-4" />
+            <h3 className="text-lg font-medium text-white">Editor AI is watching your footage...</h3>
+        </div>
       ) : (
-        <div className="space-y-8 animate-in fade-in duration-500 pb-20">
+        <div className={`space-y-8 animate-in fade-in duration-500 pb-20 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
             {/* Pacing Notes */}
             <div className="bg-surface border border-gray-700 p-6 rounded-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -87,22 +79,22 @@ const EditingTimeline: React.FC = () => {
                     </h3>
                     <div className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-full border border-gray-700">
                         <span className="text-gray-400 text-xs uppercase font-bold">Viral Score</span>
-                        <span className="text-accent font-bold">{plan.viral_score_prediction || 'N/A'}/10</span>
+                        <span className="text-accent font-bold">{plan?.viral_score_prediction || 'N/A'}/10</span>
                     </div>
                 </div>
                 <p className="text-lg text-gray-200 leading-relaxed italic relative z-10">
-                    "{plan.pacing_notes}"
+                    "{plan?.pacing_notes}"
                 </p>
             </div>
 
             {/* Visual Timeline */}
             <div>
                  <h4 className="text-sm font-bold text-gray-400 mb-3 flex items-center gap-2">
-                    <PlayCircle size={16} /> Final Timeline ({plan.total_duration}s)
+                    <PlayCircle size={16} /> Final Timeline ({plan?.total_duration}s)
                  </h4>
                 <div className="bg-black/40 border border-gray-800 p-8 rounded-xl overflow-x-auto">
                     <div className="flex items-center min-w-max pb-4">
-                        {(plan.timeline || []).map((item, index) => {
+                        {(plan?.timeline || []).map((item, index) => {
                             const scene = scenes.find(s => s.id === item.sceneId);
                             if (!scene) return null;
                             
@@ -164,7 +156,7 @@ const EditingTimeline: React.FC = () => {
                                     </div>
 
                                     {/* Transition Connector */}
-                                    {index < (plan.timeline || []).length - 1 && (
+                                    {index < (plan?.timeline || []).length - 1 && (
                                         <div className="flex flex-col items-center mx-1 w-16 relative z-10 shrink-0">
                                             <div className="h-[2px] w-full bg-gray-700 absolute top-14 -z-10"></div>
                                             <div className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[9px] uppercase text-gray-400 font-bold shadow-sm whitespace-nowrap overflow-hidden max-w-full text-ellipsis" title={item.transition}>
@@ -181,7 +173,7 @@ const EditingTimeline: React.FC = () => {
 
             {/* Detailed Edit List */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {(plan.timeline || []).map((item, idx) => {
+                 {(plan?.timeline || []).map((item, idx) => {
                      const scene = scenes.find(s => s.id === item.sceneId);
                      const action = item.action || 'KEEP';
                      return (

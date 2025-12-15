@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
-import { Scene, VisualSpec } from '../types';
+import { Scene } from '../types';
 import { SCENE_TYPE_COLORS, SCENE_TYPE_LABELS } from '../constants';
-import { Image as ImageIcon, RefreshCw, Clock, Camera, Film, Lightbulb, Zap, Palette, Settings } from 'lucide-react';
-import { generateSceneImage } from '../services/gemini';
+import { Image as ImageIcon, RefreshCw, Clock, Camera, Film, Lightbulb, Zap, Palette } from 'lucide-react';
 import { useAppStore } from '../store/AppContext';
 
 interface SceneCardProps {
@@ -12,42 +11,19 @@ interface SceneCardProps {
 }
 
 const SceneCard: React.FC<SceneCardProps> = ({ scene, onUpdate }) => {
-  const { settings } = useAppStore();
-  const [isGenerating, setIsGenerating] = useState(false);
+  const { settings, taskState, startSceneImageGeneration, currentProjectId } = useAppStore();
+  
   // Default to first template or a blank string
   const [selectedStyleId, setSelectedStyleId] = useState<string>(
       scene.image_style_preset || settings.imageStyleTemplates[0]?.id || ''
   );
 
-  const handleGenerateImage = async () => {
-    setIsGenerating(true);
-    
-    // Find the actual prompt text from settings based on ID
-    const styleTemplate = settings.imageStyleTemplates.find(t => t.id === selectedStyleId);
-    const stylePrompt = styleTemplate ? styleTemplate.prompt : "Photorealistic";
+  // Check global state
+  const isGenerating = currentProjectId ? taskState.generatingImageIds.has(`${currentProjectId}-${scene.id}`) : false;
 
-    try {
-      const imageUrl = await generateSceneImage(
-        scene.image_prompt, 
-        scene.visual_spec.description, 
-        stylePrompt,
-        settings
-      );
-      
-      // Save the generated image AND the preset used
-      onUpdate({ 
-          id: scene.id, 
-          generated_image_url: imageUrl,
-          image_style_preset: selectedStyleId
-      });
-    } catch (error: any) {
-      if (error.message.includes("No active image model")) {
-          alert("Please configure an Image Generation Model (Google, Jimeng 4, Kling AI, or OpenAI) in the Settings tab first.");
-      } else {
-          alert(`Failed to generate image: ${error.message || 'Unknown error'}`);
-      }
-    } finally {
-      setIsGenerating(false);
+  const handleGenerateImage = async () => {
+    if (currentProjectId) {
+        startSceneImageGeneration(currentProjectId, scene, selectedStyleId);
     }
   };
 

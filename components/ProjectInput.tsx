@@ -1,9 +1,7 @@
 
-import React, { useState } from 'react';
-import { ProjectInput as IProjectInput, Project } from '../types';
+import React, { useState, useEffect } from 'react';
+import { ProjectInput as IProjectInput } from '../types';
 import { useAppStore } from '../store/AppContext';
-import { buildScriptGenerationPrompt } from '../utils/promptBuilder';
-import { generateScript, analyzeIntent } from '../services/gemini';
 import { Wand2, Loader2, FileText, User, Clock, MessageSquarePlus, Image as ImageIcon, CheckCircle, BrainCircuit } from 'lucide-react';
 
 interface ProjectInputProps {
@@ -11,8 +9,8 @@ interface ProjectInputProps {
 }
 
 const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
-  const { addProject, settings } = useAppStore();
-  const [status, setStatus] = useState<'idle' | 'analyzing' | 'scripting' | 'success'>('idle');
+  const { settings, startProjectCreation, taskState, resetCreationState } = useAppStore();
+  const { creationStatus, isCreating } = taskState;
   
   // Initialize with first available template if exists
   const [input, setInput] = useState<IProjectInput>({
@@ -24,69 +22,24 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
     initialStyleId: settings.imageStyleTemplates[0]?.id || ''
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Watch for success status to trigger navigation
+  useEffect(() => {
+    if (creationStatus === 'success') {
+        const timer = setTimeout(() => {
+            resetCreationState(); // Reset status so we can create another one later
+            if (onSuccess) onSuccess();
+        }, 1500);
+        return () => clearTimeout(timer);
+    }
+  }, [creationStatus, onSuccess, resetCreationState]);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.rawContent) return;
-
-    try {
-      let finalContent = input.rawContent;
-
-      // 1. Intent Analysis Phase (Automatic if enabled)
-      if (settings.enableIntentAnalysis) {
-          setStatus('analyzing');
-          try {
-              finalContent = await analyzeIntent(input.rawContent, settings);
-              console.log("Intent Analysis Result:", finalContent);
-          } catch (e) {
-              console.error("Intent analysis failed, falling back to raw content", e);
-              // Fallback silently to raw content if analysis fails
-          }
-      }
-
-      // 2. Script Generation Phase
-      setStatus('scripting');
-      
-      // Update the prompt builder input with the potentially analyzed content
-      // We create a temporary input object so we don't mutate the form state visible to user
-      const processingInput = { ...input, rawContent: finalContent };
-      
-      const prompt = buildScriptGenerationPrompt(processingInput);
-      const scriptData = await generateScript(prompt, settings);
-      
-      // Post-process: Apply the selected style ID to all generated scenes
-      if (input.initialStyleId) {
-          scriptData.scenes = scriptData.scenes.map(scene => ({
-              ...scene,
-              image_style_preset: input.initialStyleId
-          }));
-      }
-
-      const newProject: Project = {
-        ...input,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        data: scriptData
-      };
-
-      // Add to store immediately
-      addProject(newProject);
-      
-      // Trigger Success Animation
-      setStatus('success');
-
-      // Wait for animation then navigate
-      setTimeout(() => {
-          if (onSuccess) onSuccess();
-      }, 1500);
-
-    } catch (err) {
-      alert("Error generating script. Please check your API key or try again.");
-      console.error(err);
-      setStatus('idle');
-    }
+    startProjectCreation(input);
   };
 
-  if (status === 'success') {
+  if (creationStatus === 'success') {
     return (
       <div className="h-full flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500">
         <div className="bg-surface border border-primary/30 p-10 rounded-2xl flex flex-col items-center shadow-2xl shadow-primary/20 max-w-md text-center">
@@ -117,8 +70,8 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
 
       <form onSubmit={handleSubmit} className="bg-surface border border-gray-800 rounded-2xl p-8 shadow-xl space-y-6 relative transition-opacity duration-300">
         
-        {/* Loading Overlay */}
-        {(status === 'analyzing' || status === 'scripting') && (
+        {/* Loading Overlay (Global State) */}
+        {isCreating && (
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 rounded-2xl flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
                 <div className="relative mb-6">
                     <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full"></div>
@@ -126,16 +79,16 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
                 </div>
                 
                 <h3 className="text-2xl font-bold mb-2">
-                    {status === 'analyzing' ? 'Analyzing Intent...' : 'Writing Script...'}
+                    {creationStatus === 'analyzing' ? 'Analyzing Intent...' : 'Writing Script...'}
                 </h3>
                 
                 <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
-                    {status === 'analyzing' && (
+                    {creationStatus === 'analyzing' && (
                         <span className="flex items-center gap-2 animate-pulse text-amber-400">
                             <BrainCircuit size={14} /> Optimizing your raw ideas
                         </span>
                     )}
-                    {status === 'scripting' && (
+                    {creationStatus === 'scripting' && (
                         <span className="flex items-center gap-2 animate-pulse text-blue-400">
                             <Wand2 size={14} /> The Director is drafting scenes
                         </span>
@@ -247,7 +200,7 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
         <div className="pt-4">
           <button 
             type="submit" 
-            disabled={status !== 'idle'}
+            disabled={isCreating}
             className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all transform active:scale-[0.99]"
           >
             <Wand2 size={20} />
