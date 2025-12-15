@@ -106,9 +106,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       alert("Invalid backup file format.");
       return;
     }
-    setProjects(importedProjects);
-    alert(`Successfully imported ${importedProjects.length} projects.`);
-    if (importedProjects.length > 0) {
+
+    setProjects(prev => {
+        const projectMap = new Map(prev.map(p => [p.id, p]));
+        let added = 0;
+        let updated = 0;
+
+        importedProjects.forEach(p => {
+            if (projectMap.has(p.id)) {
+                updated++;
+            } else {
+                added++;
+            }
+            // Add or Overwrite (if same ID)
+            projectMap.set(p.id, p);
+        });
+        
+        setTimeout(() => {
+             alert(`Import Summary:\n• Added: ${added} projects\n• Updated: ${updated} projects`);
+        }, 50);
+
+        // Sort by newest first
+        const newProjectList = Array.from(projectMap.values()).sort((a, b) => b.createdAt - a.createdAt);
+        
+        return newProjectList;
+    });
+
+    // Automatically select the first imported project if no project is currently selected
+    if (!currentProjectId && importedProjects.length > 0) {
         setCurrentProjectId(importedProjects[0].id);
     }
   };
