@@ -102,18 +102,21 @@ const EditingTimeline: React.FC = () => {
                  </h4>
                 <div className="bg-black/40 border border-gray-800 p-8 rounded-xl overflow-x-auto">
                     <div className="flex items-center min-w-max pb-4">
-                        {plan.timeline.map((item, index) => {
+                        {(plan.timeline || []).map((item, index) => {
                             const scene = scenes.find(s => s.id === item.sceneId);
                             if (!scene) return null;
                             
+                            // Safe Action access
+                            const action = item.action || 'KEEP';
+
                             // Scale: 1s = 20px, clamped
                             const width = Math.max(100, Math.min(item.newDuration * 20, 400));
                             const colorClass = SCENE_TYPE_COLORS[scene.type] || 'bg-gray-700';
 
                             // Badges logic
-                            const isHook = item.action === 'MOVE_TO_START';
+                            const isHook = action === 'MOVE_TO_START';
                             const isTrimmed = item.newDuration < item.originalDuration;
-                            const isMoved = item.action === 'REORDER';
+                            const isMoved = action === 'REORDER';
 
                             return (
                                 <div key={`${item.sceneId}-${index}`} className="flex items-center">
@@ -161,7 +164,7 @@ const EditingTimeline: React.FC = () => {
                                     </div>
 
                                     {/* Transition Connector */}
-                                    {index < plan.timeline.length - 1 && (
+                                    {index < (plan.timeline || []).length - 1 && (
                                         <div className="flex flex-col items-center mx-1 w-16 relative z-10 shrink-0">
                                             <div className="h-[2px] w-full bg-gray-700 absolute top-14 -z-10"></div>
                                             <div className="bg-gray-900 border border-gray-700 rounded px-1.5 py-0.5 text-[9px] uppercase text-gray-400 font-bold shadow-sm whitespace-nowrap overflow-hidden max-w-full text-ellipsis" title={item.transition}>
@@ -178,10 +181,11 @@ const EditingTimeline: React.FC = () => {
 
             {/* Detailed Edit List */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 {plan.timeline.map((item, idx) => {
+                 {(plan.timeline || []).map((item, idx) => {
                      const scene = scenes.find(s => s.id === item.sceneId);
+                     const action = item.action || 'KEEP';
                      return (
-                      <div key={idx} className={`bg-surface border p-4 rounded-lg flex items-start gap-3 ${item.action !== 'KEEP' ? 'border-primary/30 bg-primary/5' : 'border-gray-800'}`}>
+                      <div key={idx} className={`bg-surface border p-4 rounded-lg flex items-start gap-3 ${action !== 'KEEP' ? 'border-primary/30 bg-primary/5' : 'border-gray-800'}`}>
                           <div className="flex flex-col items-center gap-1 shrink-0">
                               <div className="bg-gray-800 text-gray-400 font-bold w-6 h-6 rounded flex items-center justify-center text-xs">
                                   #{idx + 1}
@@ -194,11 +198,11 @@ const EditingTimeline: React.FC = () => {
                           <div className="flex-1 min-w-0">
                               <div className="flex flex-wrap items-center gap-2 mb-1">
                                   <div className={`text-xs uppercase font-bold px-1.5 py-0.5 rounded ${
-                                      item.action === 'KEEP' ? 'bg-gray-700 text-gray-300' : 
-                                      item.action === 'TRIM' ? 'bg-amber-900 text-amber-300' :
-                                      item.action === 'MOVE_TO_START' ? 'bg-red-900 text-red-300' : 'bg-blue-900 text-blue-300'
+                                      action === 'KEEP' ? 'bg-gray-700 text-gray-300' : 
+                                      action === 'TRIM' ? 'bg-amber-900 text-amber-300' :
+                                      action === 'MOVE_TO_START' ? 'bg-red-900 text-red-300' : 'bg-blue-900 text-blue-300'
                                   }`}>
-                                      {item.action.replace(/_/g, ' ')}
+                                      {action.replace(/_/g, ' ')}
                                   </div>
                                   <div className="text-xs text-gray-400 flex items-center gap-1">
                                       <Timer size={10} /> {item.newDuration}s
