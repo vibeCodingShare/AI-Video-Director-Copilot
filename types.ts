@@ -75,16 +75,23 @@ export interface Project {
   editingPlan?: EditingPlan;
 }
 
+export type EditActionType = 'KEEP' | 'TRIM' | 'MOVE_TO_START' | 'REORDER';
+
 export interface EditingPlanItem {
-  sceneId: number;
+  sceneId: number; // The ID of the source scene
+  action: EditActionType;
+  originalDuration: number;
+  newDuration: number;
   transition: string;
-  duration: number;
-  notes: string;
+  reason: string; // The "Director's Commentary" on why this change was made
+  audioOverlay?: string; // For J-Cuts (e.g., "Start audio from Scene X")
 }
 
 export interface EditingPlan {
   timeline: EditingPlanItem[];
   pacing_notes: string;
+  total_duration: number;
+  viral_score_prediction: number; // 1-10
 }
 
 export interface ImageStyleTemplate {

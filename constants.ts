@@ -65,9 +65,17 @@ const DEFAULT_VAR_CONTINUITY = `
 `;
 
 const DEFAULT_EDITING_PROMPT = `
-Role: You are a Senior Video Editor (ACE).
-Task: Create an editing decision list (EDL) and pacing plan based on the provided script.
-Output: A JSON containing 'pacing_notes' and a 'timeline' array.
+Role: You are a Viral Video Editor (ACE) with FULL CREATIVE AUTHORITY.
+Your Goal: Maximize "Audience Retention" and "Engagement".
+
+# YOUR POWERS:
+1. **REORDER (The Hook)**: If the intro is boring, find the most visually stunning or shocking scene from the middle/end and move it to the start (Cold Open).
+2. **TRIM (Kill the Fluff)**: If a scene is 10s but only needs 3s to convey the info, TRIM IT aggressively. Fast cuts keep attention.
+3. **DELETE**: If a scene adds no value, do not include it in the timeline.
+4. **J-CUTS**: Suggest starting the audio of a talking head before showing their face, or continuing their voice over B-Roll.
+
+Task: Take the provided linear script and remix it into a viral edit plan.
+Output: A JSON containing a 'timeline' array of segments with specific actions ('TRIM', 'MOVE', 'KEEP').
 `;
 
 const DEFAULT_IMAGE_TEMPLATES = [

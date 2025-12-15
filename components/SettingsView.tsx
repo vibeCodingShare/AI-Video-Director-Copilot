@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store/AppContext';
 import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key, ExternalLink } from 'lucide-react';
 import { DEFAULT_SETTINGS } from '../constants';
@@ -141,6 +141,9 @@ const SettingsView: React.FC = () => {
   // State for editing a specific model config
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
 
+  // Ref for scroll container
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
   const handleSave = () => {
     updateSettings(localSettings);
     alert('Settings saved successfully');
@@ -151,6 +154,18 @@ const SettingsView: React.FC = () => {
         setLocalSettings(DEFAULT_SETTINGS);
         updateSettings(DEFAULT_SETTINGS); 
     }
+  };
+
+  const handleTabChange = (tabId: 'basic' | 'llm' | 'prompts' | 'styles') => {
+      setActiveTab(tabId);
+      // Reset scroll position when switching tabs to prevent "lost" headers
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+  };
+
+  const handlePromptSubTabChange = (subTab: 'template' | 'variables') => {
+      setPromptSubTab(subTab);
+      // Reset scroll position when switching sub-tabs
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const addImageTemplate = () => {
@@ -278,11 +293,11 @@ const SettingsView: React.FC = () => {
             {tabs.map(tab => (
                 <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center justify-center md:justify-start gap-2 px-2 md:px-4 py-2 md:py-3 rounded-lg text-xs md:text-sm font-medium transition-all truncate ${
+                    onClick={() => handleTabChange(tab.id as any)}
+                    className={`flex items-center justify-center md:justify-start gap-2 px-2 md:px-4 py-2 md:py-3 rounded-lg text-xs md:text-sm font-medium transition-all truncate border ${
                         activeTab === tab.id 
-                        ? 'bg-primary/20 text-white border border-primary/50' 
-                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                        ? 'bg-primary/20 text-white border-primary/50' 
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200 border-transparent'
                     }`}
                 >
                     <tab.icon size={16} className="shrink-0" />
@@ -292,7 +307,7 @@ const SettingsView: React.FC = () => {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8">
             
             {/* TAB 1: BASIC SETTINGS */}
             {activeTab === 'basic' && (
@@ -389,15 +404,15 @@ const SettingsView: React.FC = () => {
                 <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
                     
                     {/* Inner Tabs for Prompts */}
-                    <div className="flex items-center gap-6 border-b border-gray-800 mb-6 overflow-x-auto">
+                    <div className="flex items-center gap-6 border-b border-gray-800 mb-6 overflow-x-auto sticky top-0 bg-background z-10 pt-2">
                         <button
-                            onClick={() => setPromptSubTab('template')}
+                            onClick={() => handlePromptSubTabChange('template')}
                             className={`pb-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${promptSubTab === 'template' ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
                         >
                             System Instruction
                         </button>
                         <button
-                            onClick={() => setPromptSubTab('variables')}
+                            onClick={() => handlePromptSubTabChange('variables')}
                             className={`pb-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${promptSubTab === 'variables' ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
                         >
                             Variables

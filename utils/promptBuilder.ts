@@ -54,28 +54,41 @@ Respond ONLY with the JSON. Do not add markdown backticks.
 
 export const buildEditingPlanPrompt = (projectData: any): string => {
   return `
-Analyze the following video script and create a pacing and transition plan.
+Analyze the following linear script.
+You are a **RUTHLESS Senior Video Editor** who optimizes for **VIRAL RETENTION**.
+Do NOT just list the scenes in order. You must Remix, Reorder, and Trim.
 
 Script Data:
 ${JSON.stringify(projectData.scenes)}
 
-Task:
-Suggest transitions (Cut, Dissolve, Wipe, J-Cut, Match Cut) between scenes.
-Suggest pacing notes.
+# YOUR MANDATE:
+1. **HOOK (First 3 Seconds)**: Identify the most visually engaging or high-stakes scene from the entire script. Move it to the very beginning as a "Cold Open" / "Teaser".
+2. **KILL THE BORING**: If a scene is an "A-Roll" talking head that lasts >5 seconds, you MUST perform a 'TRIM' action to cut it down to the essential soundbite, or note that B-Roll should cover it.
+3. **PACING**: Ensure no two consecutive scenes have the exact same duration. Create a rhythm (Short, Short, Long, Short).
+4. **J-CUTS**: Look for opportunities where the audio of the next scene should start *before* the video cuts.
 
-Output JSON Format:
+# OUTPUT FORMAT
+Return a valid JSON object.
+"action" must be one of: "KEEP" (No change), "TRIM" (Shortened), "MOVE_TO_START" (The Hook), "REORDER" (Moved elsewhere).
+
 {
-  "pacing_notes": "General advice on the video's rhythm",
+  "pacing_notes": "Your aggressive strategy for this edit (e.g. 'I moved the explosion to the start to hook the viewer...')",
+  "viral_score_prediction": 8,
+  "total_duration": 120,
   "timeline": [
     {
       "sceneId": 1,
-      "transition": "Transition to next scene (e.g. Cut, J-Cut)",
-      "duration": 5,
-      "notes": "Specific rhythm note"
+      "action": "KEEP" | "TRIM" | "MOVE_TO_START" | "REORDER",
+      "originalDuration": 10,
+      "newDuration": 5,
+      "transition": "J-Cut / Hard Cut / Whip Pan",
+      "reason": "Trimmed 5s of silence to keep energy high.",
+      "audioOverlay": "Start audio of Scene 2 here" (optional)
     }
-    // ... for all scenes
+    // ... order the array in the FINAL PLAYBACK ORDER
   ]
 }
+
 Respond ONLY with the JSON.
 `;
 };
