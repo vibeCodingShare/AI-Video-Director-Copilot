@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store/AppContext';
-import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key, ExternalLink } from 'lucide-react';
+import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key, ExternalLink, Workflow, Video, Link } from 'lucide-react';
 import { DEFAULT_SETTINGS } from '../constants';
 import { ImageStyleTemplate, ModelConfig, ModelProvider } from '../types';
 
@@ -136,7 +136,7 @@ const SettingsView: React.FC = () => {
   const { settings, updateSettings } = useAppStore();
   const [localSettings, setLocalSettings] = useState(settings);
   const [activeTab, setActiveTab] = useState<'basic' | 'llm' | 'prompts' | 'styles'>('basic');
-  const [promptSubTab, setPromptSubTab] = useState<'template' | 'variables'>('template');
+  const [promptSubTab, setPromptSubTab] = useState<'template' | 'variables' | 'workflow'>('template');
   
   // State for editing a specific model config
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
@@ -162,7 +162,7 @@ const SettingsView: React.FC = () => {
       scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
   };
 
-  const handlePromptSubTabChange = (subTab: 'template' | 'variables') => {
+  const handlePromptSubTabChange = (subTab: 'template' | 'variables' | 'workflow') => {
       setPromptSubTab(subTab);
       // Reset scroll position when switching sub-tabs
       scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
@@ -264,10 +264,10 @@ const SettingsView: React.FC = () => {
   ];
 
   const availableVariables = [
-      { name: '{{DIRECTOR}}', desc: 'Emotion, Tone' },
-      { name: '{{CINEMATOGRAPHY}}', desc: 'Camera, Lighting' },
-      { name: '{{STORYBOARD}}', desc: 'Visual Content' },
-      { name: '{{CONTINUITY}}', desc: 'Logic' },
+      { name: '{{DIRECTOR}}', desc: 'Tone, Performance, Emotion' },
+      { name: '{{CINEMATOGRAPHY}}', desc: 'Camera, Art, Lighting' },
+      { name: '{{STORYBOARD}}', desc: 'Composition, Visual Rules' },
+      { name: '{{CONTINUITY}}', desc: 'Logic, Flow, Consistency' },
   ];
 
   return (
@@ -288,7 +288,7 @@ const SettingsView: React.FC = () => {
       </div>
 
       <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-        {/* Sidebar Tabs - Grid layout on mobile to avoid scrolling, Sidebar on Desktop */}
+        {/* Sidebar Tabs */}
         <div className="w-full md:w-64 bg-surface md:border-r border-b md:border-b-0 border-gray-800 p-2 md:p-4 grid grid-cols-2 gap-2 md:flex md:flex-col md:overflow-y-auto shrink-0">
             {tabs.map(tab => (
                 <button
@@ -307,11 +307,11 @@ const SettingsView: React.FC = () => {
         </div>
 
         {/* Content Area */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
             
             {/* TAB 1: BASIC SETTINGS */}
             {activeTab === 'basic' && (
-                <div className="max-w-2xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="p-4 md:p-8 max-w-2xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div>
                         <h2 className="text-xl font-bold mb-4 text-white">General Preferences</h2>
                         <div className="bg-surface border border-gray-800 rounded-lg divide-y divide-gray-800">
@@ -319,13 +319,26 @@ const SettingsView: React.FC = () => {
                             <div className="p-4 flex items-center justify-between">
                                 <div className="pr-4">
                                     <div className="font-medium text-white">Enable Intent Analysis</div>
-                                    <div className="text-xs text-gray-500">Optimizes your raw input before scripting.</div>
+                                    <div className="text-xs text-gray-500">Automatically optimizes your raw content before script generation.</div>
                                 </div>
                                 <button 
                                     onClick={() => setLocalSettings(prev => ({...prev, enableIntentAnalysis: !prev.enableIntentAnalysis}))}
                                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${localSettings.enableIntentAnalysis ? 'bg-primary' : 'bg-gray-700'}`}
                                 >
                                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.enableIntentAnalysis ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            <div className="p-4 flex items-center justify-between">
+                                <div className="pr-4">
+                                    <div className="font-medium text-white">Auto-Generate Images</div>
+                                    <div className="text-xs text-gray-500">Automatically generate storyboard images when script is created.</div>
+                                </div>
+                                <button 
+                                    onClick={() => setLocalSettings(prev => ({...prev, autoGenerateImageOnScript: !prev.autoGenerateImageOnScript}))}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${localSettings.autoGenerateImageOnScript ? 'bg-primary' : 'bg-gray-700'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localSettings.autoGenerateImageOnScript ? 'translate-x-6' : 'translate-x-1'}`} />
                                 </button>
                             </div>
                         </div>
@@ -335,7 +348,7 @@ const SettingsView: React.FC = () => {
 
             {/* TAB 2: LLM SETTINGS (BYOK) */}
             {activeTab === 'llm' && (
-                <div className="max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="p-4 md:p-8 max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="bg-blue-900/20 border border-blue-800 p-4 rounded-lg text-sm text-blue-200 mb-6">
                         <h3 className="font-bold flex items-center gap-2 mb-1"><CheckCircle size={16} /> Bring Your Own Key (BYOK)</h3>
                         <p className="opacity-80">Configure AI providers here. Selected "Active" models are used for everything.</p>
@@ -401,104 +414,174 @@ const SettingsView: React.FC = () => {
 
             {/* TAB 3: PROMPT SETTINGS */}
             {activeTab === 'prompts' && (
-                <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
+                <div className="flex flex-col min-h-full animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
                     
                     {/* Inner Tabs for Prompts */}
-                    <div className="flex items-center gap-6 border-b border-gray-800 mb-6 overflow-x-auto sticky top-0 bg-background z-10 pt-2">
+                    <div className="sticky top-0 bg-background z-20 px-4 md:px-8 pt-4 md:pt-6 pb-2 border-b border-gray-800 flex items-center gap-6 overflow-x-auto">
                         <button
                             onClick={() => handlePromptSubTabChange('template')}
                             className={`pb-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${promptSubTab === 'template' ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
                         >
+                            <FileJson size={14} className="inline mr-2" />
                             System Instruction
                         </button>
                         <button
                             onClick={() => handlePromptSubTabChange('variables')}
                             className={`pb-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${promptSubTab === 'variables' ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
                         >
+                            <Layers size={14} className="inline mr-2" />
                             Variables
+                        </button>
+                        <button
+                            onClick={() => handlePromptSubTabChange('workflow')}
+                            className={`pb-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${promptSubTab === 'workflow' ? 'border-primary text-white' : 'border-transparent text-gray-500 hover:text-gray-300'}`}
+                        >
+                            <Workflow size={14} className="inline mr-2" />
+                            Workflow Prompts
                         </button>
                     </div>
 
-                    {/* SUB-TAB 1: TEMPLATE EDITOR */}
-                    {promptSubTab === 'template' && (
-                        <div className="space-y-6 max-w-4xl">
-                            <div>
-                                <div className="flex justify-between items-center mb-2">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                        <FileJson size={18} className="text-primary" /> Main Template
-                                    </h3>
-                                    <button onClick={() => setLocalSettings(prev => ({...prev, directorMainPrompt: DEFAULT_SETTINGS.directorMainPrompt}))} className="text-xs text-gray-500 hover:text-white">Reset Default</button>
+                    {/* Content Area */}
+                    <div className="px-4 md:px-8 py-6">
+                        {/* SUB-TAB 1: TEMPLATE EDITOR */}
+                        {promptSubTab === 'template' && (
+                            <div className="space-y-6 max-w-4xl">
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                            Main System Instruction
+                                        </h3>
+                                        <button onClick={() => setLocalSettings(prev => ({...prev, directorMainPrompt: DEFAULT_SETTINGS.directorMainPrompt}))} className="text-xs text-gray-500 hover:text-white">Reset Default</button>
+                                    </div>
+                                    <div className="relative">
+                                        <textarea 
+                                            value={localSettings.directorMainPrompt}
+                                            onChange={(e) => setLocalSettings(prev => ({...prev, directorMainPrompt: e.target.value}))}
+                                            className="w-full h-80 bg-black/50 border border-gray-700 rounded-lg p-4 text-sm font-mono text-gray-300 focus:border-primary outline-none leading-relaxed"
+                                            placeholder="Enter system prompt here..."
+                                        />
+                                    </div>
                                 </div>
-                                <div className="relative">
+
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Available Variables</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {availableVariables.map((v) => (
+                                            <div key={v.name} className="flex items-center bg-gray-800 rounded border border-gray-700 px-2 py-1" title={v.desc}>
+                                                <span className="text-primary font-mono text-[10px] font-bold mr-1">{v.name}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* SUB-TAB 2: VARIABLES FORM */}
+                        {promptSubTab === 'variables' && (
+                            <div className="max-w-4xl space-y-6">
+                                
+                                {/* 1. DIRECTOR */}
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <User className="text-emerald-400" size={20} />
+                                        <h3 className="text-lg font-bold text-white">Director (Tone & Performance)</h3>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-2">Define the persona, emotional tone, and dialogue style. Corresponds to <code>{'{{DIRECTOR}}'}</code>.</p>
                                     <textarea 
-                                        value={localSettings.directorMainPrompt}
-                                        onChange={(e) => setLocalSettings(prev => ({...prev, directorMainPrompt: e.target.value}))}
-                                        className="w-full h-80 bg-black/50 border border-gray-700 rounded-lg p-4 text-sm font-mono text-gray-300 focus:border-primary outline-none leading-relaxed"
-                                        placeholder="Enter system prompt here..."
+                                        value={localSettings.directorVar_director}
+                                        onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_director: e.target.value}))}
+                                        className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-emerald-500 outline-none"
+                                    />
+                                </div>
+
+                                {/* 2. CINEMATOGRAPHY */}
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Video className="text-purple-400" size={20} />
+                                        <h3 className="text-lg font-bold text-white">Cinematography (Camera & Lighting)</h3>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-2">Define camera moves, shot sizes, and lighting rules. Corresponds to <code>{'{{CINEMATOGRAPHY}}'}</code>.</p>
+                                    <textarea 
+                                        value={localSettings.directorVar_cinematography}
+                                        onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_cinematography: e.target.value}))}
+                                        className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-purple-500 outline-none"
+                                    />
+                                </div>
+
+                                {/* 3. STORYBOARD */}
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Layers className="text-blue-400" size={20} />
+                                        <h3 className="text-lg font-bold text-white">Storyboard (Structure & Content)</h3>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-2">Define scene types (A-Roll, B-Roll, Screencast) and visual content rules. Corresponds to <code>{'{{STORYBOARD}}'}</code>.</p>
+                                    <textarea 
+                                        value={localSettings.directorVar_storyboard}
+                                        onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_storyboard: e.target.value}))}
+                                        className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-blue-500 outline-none"
+                                    />
+                                </div>
+
+                                {/* 4. CONTINUITY */}
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <Link className="text-amber-400" size={20} />
+                                        <h3 className="text-lg font-bold text-white">Continuity (Logic & Flow)</h3>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-2">Define instructions for the Script Supervisor regarding logic and transitions. Corresponds to <code>{'{{CONTINUITY}}'}</code>.</p>
+                                    <textarea 
+                                        value={localSettings.directorVar_continuity}
+                                        onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_continuity: e.target.value}))}
+                                        className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-amber-500 outline-none"
                                     />
                                 </div>
                             </div>
+                        )}
 
-                            <div className="bg-surface border border-gray-800 rounded-lg p-4">
-                                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Available Variables</h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {availableVariables.map((v) => (
-                                        <div key={v.name} className="flex items-center bg-gray-800 rounded border border-gray-700 px-2 py-1" title={v.desc}>
-                                            <span className="text-primary font-mono text-[10px] font-bold mr-1">{v.name}</span>
+                        {/* SUB-TAB 3: WORKFLOW PROMPTS */}
+                        {promptSubTab === 'workflow' && (
+                            <div className="max-w-4xl space-y-6">
+                                
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Cpu className="text-amber-400" size={20} />
+                                            <h3 className="text-lg font-bold text-white">Intent Analysis Prompt</h3>
                                         </div>
-                                    ))}
+                                        <button onClick={() => setLocalSettings(prev => ({...prev, intentPrompt: DEFAULT_SETTINGS.intentPrompt}))} className="text-xs text-gray-500 hover:text-white">Reset</button>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-2">Used when "Enable Intent Analysis" is ON. Analyzes raw input before scripting.</p>
+                                    <textarea 
+                                        value={localSettings.intentPrompt}
+                                        onChange={(e) => setLocalSettings(prev => ({...prev, intentPrompt: e.target.value}))}
+                                        className="w-full h-40 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-amber-500 outline-none"
+                                    />
                                 </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* SUB-TAB 2: VARIABLES FORM */}
-                    {promptSubTab === 'variables' && (
-                        <div className="max-w-4xl space-y-6">
-                            
-                            <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <User className="text-emerald-400" size={20} />
-                                    <h3 className="text-lg font-bold text-white">Director Persona</h3>
+                                <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <Scissors className="text-accent" size={20} />
+                                            <h3 className="text-lg font-bold text-white">Editing Plan Prompt</h3>
+                                        </div>
+                                        <button onClick={() => setLocalSettings(prev => ({...prev, editingPrompt: DEFAULT_SETTINGS.editingPrompt}))} className="text-xs text-gray-500 hover:text-white">Reset</button>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mb-2">Used by the Viral Video Editor to remix and trim scenes.</p>
+                                    <textarea 
+                                        value={localSettings.editingPrompt}
+                                        onChange={(e) => setLocalSettings(prev => ({...prev, editingPrompt: e.target.value}))}
+                                        className="w-full h-40 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-accent outline-none"
+                                    />
                                 </div>
-                                <textarea 
-                                    value={localSettings.directorVar_director}
-                                    onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_director: e.target.value}))}
-                                    className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-emerald-500 outline-none"
-                                />
                             </div>
-
-                            <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Layers className="text-blue-400" size={20} />
-                                    <h3 className="text-lg font-bold text-white">Storyboard Rules</h3>
-                                </div>
-                                <textarea 
-                                    value={localSettings.directorVar_storyboard}
-                                    onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_storyboard: e.target.value}))}
-                                    className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-blue-500 outline-none"
-                                />
-                            </div>
-
-                            <div className="bg-surface border border-gray-800 rounded-lg p-4 md:p-6">
-                                <div className="flex items-center gap-2 mb-4">
-                                    <Clapperboard className="text-purple-400" size={20} />
-                                    <h3 className="text-lg font-bold text-white">Cinematography</h3>
-                                </div>
-                                <textarea 
-                                    value={localSettings.directorVar_cinematography}
-                                    onChange={(e) => setLocalSettings(prev => ({...prev, directorVar_cinematography: e.target.value}))}
-                                    className="w-full h-32 bg-black/30 border border-gray-700 rounded p-3 text-sm font-mono text-white focus:border-purple-500 outline-none"
-                                />
-                            </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             )}
 
             {/* TAB 4: VISUAL STYLES */}
             {activeTab === 'styles' && (
-                <div className="max-w-5xl space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
+                <div className="p-4 md:p-8 max-w-5xl space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
                      <div className="flex justify-between items-center mb-6">
                         <div>
                             <h2 className="text-xl font-bold text-white flex items-center gap-2">

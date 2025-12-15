@@ -4,7 +4,7 @@ import { ProjectInput as IProjectInput, Project } from '../types';
 import { useAppStore } from '../store/AppContext';
 import { buildScriptGenerationPrompt } from '../utils/promptBuilder';
 import { generateScript, analyzeIntent } from '../services/gemini';
-import { Wand2, Loader2, FileText, User, Clock, MessageSquarePlus, Sparkles, Image as ImageIcon, CheckCircle, ArrowRight } from 'lucide-react';
+import { Wand2, Loader2, FileText, User, Clock, MessageSquarePlus, Image as ImageIcon, CheckCircle, BrainCircuit } from 'lucide-react';
 
 interface ProjectInputProps {
   onSuccess?: () => void;
@@ -12,9 +12,7 @@ interface ProjectInputProps {
 
 const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
   const { addProject, settings } = useAppStore();
-  const [loading, setLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'analyzing' | 'scripting' | 'success'>('idle');
   
   // Initialize with first available template if exists
   const [input, setInput] = useState<IProjectInput>({
@@ -26,29 +24,33 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
     initialStyleId: settings.imageStyleTemplates[0]?.id || ''
   });
 
-  const handleAnalyze = async () => {
-    if (!input.rawContent) return;
-    setAnalyzing(true);
-    try {
-        const refined = await analyzeIntent(input.rawContent, settings);
-        setInput(prev => ({
-            ...prev,
-            rawContent: refined
-        }));
-    } catch (e) {
-        alert("Analysis failed.");
-    } finally {
-        setAnalyzing(false);
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.rawContent) return;
 
-    setLoading(true);
     try {
-      const prompt = buildScriptGenerationPrompt(input);
+      let finalContent = input.rawContent;
+
+      // 1. Intent Analysis Phase (Automatic if enabled)
+      if (settings.enableIntentAnalysis) {
+          setStatus('analyzing');
+          try {
+              finalContent = await analyzeIntent(input.rawContent, settings);
+              console.log("Intent Analysis Result:", finalContent);
+          } catch (e) {
+              console.error("Intent analysis failed, falling back to raw content", e);
+              // Fallback silently to raw content if analysis fails
+          }
+      }
+
+      // 2. Script Generation Phase
+      setStatus('scripting');
+      
+      // Update the prompt builder input with the potentially analyzed content
+      // We create a temporary input object so we don't mutate the form state visible to user
+      const processingInput = { ...input, rawContent: finalContent };
+      
+      const prompt = buildScriptGenerationPrompt(processingInput);
       const scriptData = await generateScript(prompt, settings);
       
       // Post-process: Apply the selected style ID to all generated scenes
@@ -70,8 +72,7 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
       addProject(newProject);
       
       // Trigger Success Animation
-      setLoading(false);
-      setIsSuccess(true);
+      setStatus('success');
 
       // Wait for animation then navigate
       setTimeout(() => {
@@ -81,11 +82,11 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
     } catch (err) {
       alert("Error generating script. Please check your API key or try again.");
       console.error(err);
-      setLoading(false);
+      setStatus('idle');
     }
   };
 
-  if (isSuccess) {
+  if (status === 'success') {
     return (
       <div className="h-full flex flex-col items-center justify-center animate-in fade-in zoom-in duration-500">
         <div className="bg-surface border border-primary/30 p-10 rounded-2xl flex flex-col items-center shadow-2xl shadow-primary/20 max-w-md text-center">
@@ -116,11 +117,30 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
 
       <form onSubmit={handleSubmit} className="bg-surface border border-gray-800 rounded-2xl p-8 shadow-xl space-y-6 relative transition-opacity duration-300">
         
-        {loading && (
-            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm z-50 rounded-2xl flex flex-col items-center justify-center text-white">
-                <Loader2 size={48} className="animate-spin text-primary mb-4" />
-                <h3 className="text-xl font-bold">Writing Script...</h3>
-                <p className="text-gray-400 text-sm mt-2">The AI Director is analyzing your request</p>
+        {/* Loading Overlay */}
+        {(status === 'analyzing' || status === 'scripting') && (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 rounded-2xl flex flex-col items-center justify-center text-white animate-in fade-in duration-300">
+                <div className="relative mb-6">
+                    <div className="absolute inset-0 bg-primary/30 blur-xl rounded-full"></div>
+                    <Loader2 size={48} className="animate-spin text-primary relative z-10" />
+                </div>
+                
+                <h3 className="text-2xl font-bold mb-2">
+                    {status === 'analyzing' ? 'Analyzing Intent...' : 'Writing Script...'}
+                </h3>
+                
+                <div className="flex flex-col items-center gap-2 text-sm text-gray-400">
+                    {status === 'analyzing' && (
+                        <span className="flex items-center gap-2 animate-pulse text-amber-400">
+                            <BrainCircuit size={14} /> Optimizing your raw ideas
+                        </span>
+                    )}
+                    {status === 'scripting' && (
+                        <span className="flex items-center gap-2 animate-pulse text-blue-400">
+                            <Wand2 size={14} /> The Director is drafting scenes
+                        </span>
+                    )}
+                </div>
             </div>
         )}
 
@@ -168,7 +188,7 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
           </div>
         </div>
         
-        {/* Style Selection - New Feature */}
+        {/* Style Selection */}
         <div>
            <label className="flex items-center gap-2 text-sm font-medium text-gray-300 mb-2">
               <ImageIcon size={16} /> Visual Style Template
@@ -189,23 +209,16 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
            <p className="text-xs text-gray-500 mt-1">This style will be applied to all storyboard images generated for this project.</p>
         </div>
 
-        {/* Raw Content with Optimization */}
+        {/* Raw Content */}
         <div>
            <div className="flex justify-between items-center mb-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
                     <MessageSquarePlus size={16} /> Raw Content / Ideas
                 </label>
-                
                 {settings.enableIntentAnalysis && (
-                  <button 
-                      type="button"
-                      onClick={handleAnalyze}
-                      disabled={analyzing || !input.rawContent}
-                      className="text-xs flex items-center gap-1.5 text-accent hover:text-white transition-colors disabled:opacity-50"
-                  >
-                      {analyzing ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                      Optimize with AI
-                  </button>
+                    <span className="text-[10px] bg-amber-900/40 text-amber-400 px-2 py-0.5 rounded border border-amber-900/50 flex items-center gap-1">
+                        <BrainCircuit size={10} /> Auto-Optimization Enabled
+                    </span>
                 )}
            </div>
           <textarea 
@@ -234,20 +247,11 @@ const ProjectInput: React.FC<ProjectInputProps> = ({ onSuccess }) => {
         <div className="pt-4">
           <button 
             type="submit" 
-            disabled={loading}
+            disabled={status !== 'idle'}
             className="w-full bg-primary hover:bg-blue-600 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-3 transition-all transform active:scale-[0.99]"
           >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" />
-                Generating Script...
-              </>
-            ) : (
-              <>
-                <Wand2 size={20} />
-                Generate Director's Script
-              </>
-            )}
+            <Wand2 size={20} />
+            Generate Director's Script
           </button>
         </div>
       </form>
