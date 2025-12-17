@@ -208,8 +208,9 @@ async function signVolcengineRequest(
     const dateStamp = amzDate.slice(0, 8); // YYYYMMDD
 
     // 1. Canonical Request
-    const canonicalUri = path;
-    const canonicalQueryString = query; // Assuming already sorted or empty
+    // Ensure canonicalUri is just the path, usually "/" for the gateway if no path provided
+    const canonicalUri = path || "/";
+    const canonicalQueryString = query; // Assuming already sorted
     // IMPORTANT: Host header is included in signature calculation
     const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-date:${amzDate}\n`;
     const signedHeaders = "content-type;host;x-date";
@@ -262,63 +263,143 @@ const callJimengVisualGen = async (config: ModelConfig, prompt: string): Promise
         throw new Error("Access Key and Secret Key are required for Jimeng (Native API).");
     }
 
-    // Default to correct Public API endpoint: visual.volcengineapi.com
-    const fullUrl = config.baseUrl || 'https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images';
-    const urlObj = new URL(fullUrl);
+    // V4.0 Gateway URL
+    const baseUrl = config.baseUrl || 'https://visual.volcengineapi.com';
+    const host = new URL(baseUrl).host;
+
+    const reqKey = config.modelId || "jimeng_t2i_v40"; // V4.0 Fixed Key
+
+    // --- STEP 1: SUBMIT TASK (ASYNC) ---
     
-    const reqBody = {
-        req_key: config.modelId || "high_aes_general_v21_L", // Default to V2.1
+    // Fixed Action & Version for V4.0
+    const submitQuery = "Action=CVSync2AsyncSubmitTask&Version=2022-08-31"; 
+    const submitUrl = `${baseUrl}?${submitQuery}`;
+
+    const submitBody = {
+        req_key: reqKey,
         prompt: prompt,
-        model_version: "general_v2.1_L", 
-        return_url: false, // We want base64 for immediate display
-        logo_info: {
-             add_logo: false
-        }
+        // V4.0 Default recommendation is 2K resolution
+        width: 2048,
+        height: 2048,
+        scale: 0.5,
+        force_single: true // Force single image for this app's use case
     };
 
-    const bodyStr = JSON.stringify(reqBody);
-    
-    // Sign the request
-    const signedHeaders = await signVolcengineRequest(
+    const submitBodyStr = JSON.stringify(submitBody);
+
+    const submitHeaders = await signVolcengineRequest(
         config.accessKey,
         config.secretKey,
         "POST",
-        urlObj.host, // Used for signature calculation
-        urlObj.pathname,
-        urlObj.search.slice(1), 
+        host,
+        "/", // Path is usually root for the gateway
+        submitQuery,
         "application/json",
-        bodyStr
+        submitBodyStr
     );
 
-    const response = await fetch(fullUrl, {
+    const submitRes = await fetch(submitUrl, {
         method: 'POST',
-        headers: signedHeaders,
-        body: bodyStr
+        headers: submitHeaders,
+        body: submitBodyStr
     });
 
-    if (!response.ok) {
-        const txt = await response.text();
-        throw new Error(`Jimeng API Failed: ${txt}`);
+    if (!submitRes.ok) {
+        const txt = await submitRes.text();
+        throw new Error(`Jimeng Submit Failed: ${txt}`);
     }
 
-    const json = await response.json();
+    const submitJson = await submitRes.json();
+    if (submitJson.code !== 10000) {
+        throw new Error(`Jimeng Submit Error ${submitJson.code}: ${submitJson.message}`);
+    }
+
+    const taskId = submitJson.data?.task_id;
+    if (!taskId) {
+        throw new Error("Jimeng response missing task_id");
+    }
+
+    // --- STEP 2: POLL STATUS ---
+
+    const pollQuery = "Action=CVSync2AsyncGetResult&Version=2022-08-31";
+    const pollUrl = `${baseUrl}?${pollQuery}`;
     
-    // Handle standard response: { code: 10000, data: { binary_data_base64: [...] } }
-    if (json.code !== 10000) {
-        throw new Error(`Jimeng Error Code ${json.code}: ${json.message}`);
+    // Config for return format
+    const pollReqJson = JSON.stringify({
+        return_url: true, 
+        logo_info: { add_logo: false }
+    });
+
+    const pollBody = {
+        req_key: reqKey,
+        task_id: taskId,
+        req_json: pollReqJson
+    };
+    const pollBodyStr = JSON.stringify(pollBody);
+
+    let attempts = 0;
+    const MAX_ATTEMPTS = 60; // 2 minutes max (approx)
+    
+    while (attempts < MAX_ATTEMPTS) {
+        await new Promise(r => setTimeout(r, 2000)); // Wait 2s
+        attempts++;
+
+        // Re-sign per request due to timestamp
+        const pollHeaders = await signVolcengineRequest(
+            config.accessKey,
+            config.secretKey,
+            "POST",
+            host,
+            "/",
+            pollQuery,
+            "application/json",
+            pollBodyStr
+        );
+
+        const pollRes = await fetch(pollUrl, {
+            method: 'POST',
+            headers: pollHeaders,
+            body: pollBodyStr
+        });
+
+        if (!pollRes.ok) {
+           // If poll fails network-wise, retry
+           console.warn("Jimeng poll network error, retrying...");
+           continue; 
+        }
+
+        const pollJson = await pollRes.json();
+        
+        // Check outer code
+        if (pollJson.code !== 10000) {
+            // Some error codes might be retriable, but for simplicity we throw
+            throw new Error(`Jimeng Poll Error ${pollJson.code}: ${pollJson.message}`);
+        }
+
+        const status = pollJson.data?.status;
+
+        if (status === 'done' || status === 'succeed' || status === 'success') {
+            // Success!
+            const imageUrls = pollJson.data?.image_urls;
+            if (imageUrls && imageUrls.length > 0) {
+                return imageUrls[0];
+            }
+            const base64List = pollJson.data?.binary_data_base64;
+            if (base64List && base64List.length > 0) {
+                return `data:image/jpeg;base64,${base64List[0]}`;
+            }
+            throw new Error("Jimeng task done but no image data returned.");
+
+        } else if (status === 'failed' || status === 'failure') {
+            throw new Error("Jimeng task failed according to status.");
+        } else if (status === 'not_found' || status === 'expired') {
+            throw new Error(`Jimeng task status: ${status}`);
+        }
+        
+        // If 'generating' or 'in_queue', continue loop
     }
 
-    const base64Data = json.data?.binary_data_base64?.[0];
-    if (base64Data) {
-        return `data:image/png;base64,${base64Data}`;
-    }
-
-    const imageUrl = json.data?.image_urls?.[0];
-    if (imageUrl) {
-        return imageUrl;
-    }
-
-    throw new Error("No image data found in Jimeng response.");
+    throw new Error("Jimeng Generation Timed Out");
 };
 
 // --- KLING AI JWT GENERATION (Browser Compatible) ---

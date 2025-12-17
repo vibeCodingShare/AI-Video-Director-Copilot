@@ -83,11 +83,11 @@ const ModelConfigRow: React.FC<ModelConfigRowProps> = ({
                     <label className="text-xs text-gray-500 block mb-1">Model ID / Request Key</label>
                     <input 
                         className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white"
-                        placeholder={config.provider === 'jimeng' ? "e.g. high_aes_general_v21_L" : "Model ID"}
+                        placeholder={config.provider === 'jimeng' ? "e.g. jimeng_t2i_v40" : "Model ID"}
                         value={config.modelId}
                         onChange={e => onUpdate({ modelId: e.target.value })}
                     />
-                    {config.provider === 'jimeng' && <p className="text-[9px] text-gray-500 mt-1">Found in docs as `req_key`.</p>}
+                    {config.provider === 'jimeng' && <p className="text-[9px] text-gray-500 mt-1">V4.0 Fixed Key: <code>jimeng_t2i_v40</code></p>}
                 </div>
 
                 {/* Conditional Inputs for AK/SK Providers */}
@@ -148,7 +148,7 @@ const ModelConfigRow: React.FC<ModelConfigRowProps> = ({
                          <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2">
                              {config.provider === 'jimeng' && (
                                 <span className="text-primary flex items-center gap-1">
-                                    Default: https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images
+                                    Base URL: https://visual.volcengineapi.com
                                 </span>
                              )}
                              {config.provider === 'kling' && (
@@ -259,8 +259,8 @@ const SettingsView: React.FC = () => {
         const updatedModel = { ...m, ...updates };
         // Auto-fill defaults for Jimeng (Native API)
         if (updates.provider === 'jimeng' && m.provider !== 'jimeng') {
-            updatedModel.baseUrl = 'https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images';
-            updatedModel.modelId = 'high_aes_general_v21_L'; // Typical req_key
+            updatedModel.baseUrl = 'https://visual.volcengineapi.com';
+            updatedModel.modelId = 'jimeng_t2i_v40'; // V4.0 Fixed Key
             if (!updatedModel.name.includes('Jimeng')) updatedModel.name = 'Jimeng (即梦)';
         }
         // Auto-fill defaults for Kling
