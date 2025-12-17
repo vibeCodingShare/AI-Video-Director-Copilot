@@ -106,7 +106,9 @@ export interface ModelConfig {
   id: string;
   name: string; // User defined name e.g. "My DeepSeek"
   provider: ModelProvider;
-  apiKey: string;
+  apiKey: string; // Used for Google/OpenAI
+  accessKey?: string; // Used for Kling
+  secretKey?: string; // Used for Kling
   baseUrl?: string; // Optional for OpenAI compatible
   modelId: string; // e.g. "gemini-2.5-flash", "gpt-4", "deepseek-chat"
 }

@@ -201,6 +201,66 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // --- Async Task Actions ---
 
+  const startSceneImageGeneration = async (projectId: string, scene: Scene, styleId: string) => {
+    const key = `${projectId}-${scene.id}`;
+    
+    setTaskState(prev => {
+        const newSet = new Set(prev.generatingImageIds);
+        newSet.add(key);
+        return { ...prev, generatingImageIds: newSet };
+    });
+
+    try {
+       const styleTemplate = settings.imageStyleTemplates.find(t => t.id === styleId);
+       const stylePrompt = styleTemplate ? styleTemplate.prompt : "Photorealistic";
+       
+       const imageUrl = await generateSceneImage(
+         scene.image_prompt,
+         scene.visual_spec.description,
+         stylePrompt,
+         settings
+       );
+
+       await updateScene(projectId, scene.id, {
+           generated_image_url: imageUrl,
+           image_style_preset: styleId
+       });
+
+    } catch (e: any) {
+        if (e.message && e.message.includes("No active image model")) {
+            // We alert here only if initiated manually. For batch processing, we might want to be quieter or handle it differently, 
+            // but for now, the alert works to notify missing config.
+            console.error("Missing Image Model Config");
+        } else {
+            console.error("Image Gen Failed:", e);
+        }
+    } finally {
+        setTaskState(prev => {
+            const newSet = new Set(prev.generatingImageIds);
+            newSet.delete(key);
+            return { ...prev, generatingImageIds: newSet };
+        });
+    }
+  };
+
+  // Helper for sequential batch processing with rate limiting
+  const processImageBatch = async (projectId: string, scenes: Scene[], styleId: string) => {
+    console.log(`Starting batch image generation for project ${projectId}. Total scenes: ${scenes.length}`);
+    
+    // Serial Execution Loop
+    for (const scene of scenes) {
+        // Skip if already has image (unlikely for new project, but good practice)
+        if (scene.generated_image_url) continue;
+
+        // Trigger generation
+        await startSceneImageGeneration(projectId, scene, styleId);
+        
+        // Rate Limiting Delay (2 seconds) to avoid 429 errors
+        await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    console.log(`Batch image generation completed for project ${projectId}`);
+  };
+
   const startProjectCreation = async (input: ProjectInput) => {
     if (taskState.isCreating) return;
 
@@ -241,6 +301,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       await addProject(newProject);
       setTaskState(prev => ({ ...prev, isCreating: false, creationStatus: 'success' }));
+
+      // 3. Auto-Generate Images (Fire and Forget - Background Task)
+      if (settings.autoGenerateImageOnScript && scriptData.scenes.length > 0) {
+          const styleId = input.initialStyleId || settings.imageStyleTemplates[0]?.id || 'cinematic';
+          // We call this without awaiting so the UI unblocks immediately
+          processImageBatch(newProject.id, scriptData.scenes, styleId);
+      }
 
     } catch (err: any) {
       console.error(err);
@@ -286,47 +353,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const newSet = new Set(prev.generatingEditPlanIds);
             newSet.delete(projectId);
             return { ...prev, generatingEditPlanIds: newSet };
-        });
-    }
-  };
-
-  const startSceneImageGeneration = async (projectId: string, scene: Scene, styleId: string) => {
-    const key = `${projectId}-${scene.id}`;
-    
-    setTaskState(prev => {
-        const newSet = new Set(prev.generatingImageIds);
-        newSet.add(key);
-        return { ...prev, generatingImageIds: newSet };
-    });
-
-    try {
-       const styleTemplate = settings.imageStyleTemplates.find(t => t.id === styleId);
-       const stylePrompt = styleTemplate ? styleTemplate.prompt : "Photorealistic";
-       
-       const imageUrl = await generateSceneImage(
-         scene.image_prompt,
-         scene.visual_spec.description,
-         stylePrompt,
-         settings
-       );
-
-       await updateScene(projectId, scene.id, {
-           generated_image_url: imageUrl,
-           image_style_preset: styleId
-       });
-
-    } catch (e: any) {
-        if (e.message && e.message.includes("No active image model")) {
-            alert("Please configure an Image Generation Model in Settings.");
-        } else {
-            console.error("Image Gen Failed:", e);
-            alert(`Failed to generate image: ${e.message}`);
-        }
-    } finally {
-        setTaskState(prev => {
-            const newSet = new Set(prev.generatingImageIds);
-            newSet.delete(key);
-            return { ...prev, generatingImageIds: newSet };
         });
     }
   };

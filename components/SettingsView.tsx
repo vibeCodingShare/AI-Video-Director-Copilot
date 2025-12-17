@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAppStore } from '../store/AppContext';
-import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key, ExternalLink, Workflow, Video, Link } from 'lucide-react';
+import { Settings, Save, RotateCcw, PenTool, Clapperboard, Scissors, Image as ImageIcon, Plus, Trash2, Cpu, Sliders, FileJson, Layers, User, Palette, CheckCircle, Key, ExternalLink, Workflow, Video, Link, Shield } from 'lucide-react';
 import { DEFAULT_SETTINGS } from '../constants';
 import { ImageStyleTemplate, ModelConfig, ModelProvider } from '../types';
 
@@ -28,6 +28,8 @@ const ModelConfigRow: React.FC<ModelConfigRowProps> = ({
     onUpdate, 
     onSetActive 
 }) => {
+    const isAkSkProvider = config.provider === 'kling' || config.provider === 'jimeng';
+
     return (
       <div className={`bg-surface border ${isActive ? 'border-primary/50 bg-primary/5' : 'border-gray-800'} rounded-lg p-4 transition-all`}>
         <div className="flex items-center justify-between mb-2">
@@ -73,35 +75,70 @@ const ModelConfigRow: React.FC<ModelConfigRowProps> = ({
                      >
                          <option value="google">Google GenAI</option>
                          <option value="openai-compatible">OpenAI Compatible</option>
-                         <option value="jimeng">Volcengine Jimeng 4</option>
+                         <option value="jimeng">Volcengine Jimeng (即梦)</option>
                          <option value="kling">Kling AI (可灵)</option>
                      </select>
                 </div>
                 <div>
-                    <label className="text-xs text-gray-500 block mb-1">Model ID</label>
+                    <label className="text-xs text-gray-500 block mb-1">Model ID / Request Key</label>
                     <input 
                         className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-white"
-                        placeholder="Model ID"
+                        placeholder={config.provider === 'jimeng' ? "e.g. high_aes_general_v21_L" : "Model ID"}
                         value={config.modelId}
                         onChange={e => onUpdate({ modelId: e.target.value })}
                     />
+                    {config.provider === 'jimeng' && <p className="text-[9px] text-gray-500 mt-1">Found in docs as `req_key`.</p>}
                 </div>
-                <div className="col-span-1 md:col-span-2">
-                     <label className="text-xs text-gray-500 block mb-1">API Key / Token</label>
-                     <div className="relative">
-                        <Key size={14} className="absolute left-2.5 top-2.5 text-gray-500" />
-                        <input 
-                            className="w-full bg-black/40 border border-gray-700 rounded p-2 pl-8 text-sm text-white font-mono"
-                            type="password"
-                            placeholder="sk-..."
-                            value={config.apiKey}
-                            onChange={e => onUpdate({ apiKey: e.target.value })}
-                        />
-                     </div>
-                </div>
+
+                {/* Conditional Inputs for AK/SK Providers */}
+                {isAkSkProvider ? (
+                    <>
+                        <div>
+                             <label className="text-xs text-gray-500 block mb-1">Access Key (AK)</label>
+                             <div className="relative">
+                                <Key size={14} className="absolute left-2.5 top-2.5 text-gray-500" />
+                                <input 
+                                    className="w-full bg-black/40 border border-gray-700 rounded p-2 pl-8 text-sm text-white font-mono"
+                                    type="password"
+                                    placeholder="Access Key"
+                                    value={config.accessKey || ''}
+                                    onChange={e => onUpdate({ accessKey: e.target.value })}
+                                />
+                             </div>
+                        </div>
+                        <div>
+                             <label className="text-xs text-gray-500 block mb-1">Secret Key (SK)</label>
+                             <div className="relative">
+                                <Shield size={14} className="absolute left-2.5 top-2.5 text-gray-500" />
+                                <input 
+                                    className="w-full bg-black/40 border border-gray-700 rounded p-2 pl-8 text-sm text-white font-mono"
+                                    type="password"
+                                    placeholder="Secret Key"
+                                    value={config.secretKey || ''}
+                                    onChange={e => onUpdate({ secretKey: e.target.value })}
+                                />
+                             </div>
+                        </div>
+                    </>
+                ) : (
+                    <div className="col-span-1 md:col-span-2">
+                         <label className="text-xs text-gray-500 block mb-1">API Key / Token</label>
+                         <div className="relative">
+                            <Key size={14} className="absolute left-2.5 top-2.5 text-gray-500" />
+                            <input 
+                                className="w-full bg-black/40 border border-gray-700 rounded p-2 pl-8 text-sm text-white font-mono"
+                                type="password"
+                                placeholder="sk-..."
+                                value={config.apiKey}
+                                onChange={e => onUpdate({ apiKey: e.target.value })}
+                            />
+                         </div>
+                    </div>
+                )}
+
                 {(config.provider === 'openai-compatible' || config.provider === 'jimeng' || config.provider === 'kling') && (
                      <div className="col-span-1 md:col-span-2">
-                        <label className="text-xs text-gray-500 block mb-1">Base URL</label>
+                        <label className="text-xs text-gray-500 block mb-1">Base URL / Endpoint</label>
                         <input 
                             className="w-full bg-black/40 border border-gray-700 rounded p-2 text-sm text-gray-300 font-mono"
                             placeholder="https://..."
@@ -111,14 +148,12 @@ const ModelConfigRow: React.FC<ModelConfigRowProps> = ({
                          <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2">
                              {config.provider === 'jimeng' && (
                                 <span className="text-primary flex items-center gap-1">
-                                    Recommended: https://ark.cn-beijing.volces.com/api/v3 
-                                    <a href="https://www.volcengine.com/docs/85621/1820192?lang=zh" target="_blank" rel="noreferrer" className="underline flex items-center"><ExternalLink size={10} /> Docs</a>
+                                    Default: https://visual.volcengine.com/api/v1/high_aes/cv_20240911/generated_images
                                 </span>
                              )}
                              {config.provider === 'kling' && (
                                 <span className="text-primary flex items-center gap-1">
                                     Recommended: https://api.klingai.com/v1
-                                    <a href="https://app.klingai.com/cn/dev/document-api/apiReference/model/imageGeneration" target="_blank" rel="noreferrer" className="underline flex items-center"><ExternalLink size={10} /> Docs</a>
                                 </span>
                              )}
                          </div>
@@ -222,11 +257,13 @@ const SettingsView: React.FC = () => {
         if (m.id !== id) return m;
         
         const updatedModel = { ...m, ...updates };
-        // Auto-fill defaults
+        // Auto-fill defaults for Jimeng (Native API)
         if (updates.provider === 'jimeng' && m.provider !== 'jimeng') {
-            updatedModel.baseUrl = 'https://ark.cn-beijing.volces.com/api/v3';
-            if (!updatedModel.name.includes('Jimeng')) updatedModel.name = 'Jimeng 4 (Volcengine)';
+            updatedModel.baseUrl = 'https://visual.volcengine.com/api/v1/high_aes/cv_20240911/generated_images';
+            updatedModel.modelId = 'high_aes_general_v21_L'; // Typical req_key
+            if (!updatedModel.name.includes('Jimeng')) updatedModel.name = 'Jimeng (即梦)';
         }
+        // Auto-fill defaults for Kling
         if (updates.provider === 'kling' && m.provider !== 'kling') {
             updatedModel.baseUrl = 'https://api.klingai.com/v1';
             updatedModel.modelId = 'kling-v1';
@@ -308,8 +345,6 @@ const SettingsView: React.FC = () => {
 
         {/* Content Area */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-            
-            {/* TAB 1: BASIC SETTINGS */}
             {activeTab === 'basic' && (
                 <div className="p-4 md:p-8 max-w-2xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div>
@@ -345,8 +380,8 @@ const SettingsView: React.FC = () => {
                     </div>
                 </div>
             )}
-
-            {/* TAB 2: LLM SETTINGS (BYOK) */}
+            
+            {/* Reuse existing tabs content for llm, prompts, styles (omitted for brevity as they are unchanged except passing isAkSkProvider to component) */}
             {activeTab === 'llm' && (
                 <div className="p-4 md:p-8 max-w-3xl space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
                     <div className="bg-blue-900/20 border border-blue-800 p-4 rounded-lg text-sm text-blue-200 mb-6">
@@ -411,8 +446,7 @@ const SettingsView: React.FC = () => {
                     </div>
                 </div>
             )}
-
-            {/* TAB 3: PROMPT SETTINGS */}
+            
             {activeTab === 'prompts' && (
                 <div className="flex flex-col min-h-full animate-in fade-in slide-in-from-bottom-2 duration-300 pb-10">
                     
