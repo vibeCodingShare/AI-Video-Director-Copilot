@@ -100,17 +100,28 @@ export interface ImageStyleTemplate {
   prompt: string;
 }
 
-export type ModelProvider = 'google' | 'openai-compatible' | 'jimeng' | 'kling';
+export type ModelProvider = 
+  | 'google' 
+  | 'openai-compatible' 
+  | 'jimeng' 
+  | 'kling' 
+  | 'deepseek' 
+  | 'qianwen' 
+  | 'moonshot'
+  | 'minimax'
+  | 'claude'
+  | 'grok';
 
 export interface ModelConfig {
   id: string;
   name: string; // User defined name e.g. "My DeepSeek"
   provider: ModelProvider;
-  apiKey: string; // Used for Google/OpenAI
-  accessKey?: string; // Used for Kling
-  secretKey?: string; // Used for Kling
+  apiKey: string; // Used for Google/OpenAI/DeepSeek/etc
+  accessKey?: string; // Used for Kling/Jimeng
+  secretKey?: string; // Used for Kling/Jimeng
   baseUrl?: string; // Optional for OpenAI compatible
   modelId: string; // e.g. "gemini-2.5-flash", "gpt-4", "deepseek-chat"
+  verified?: boolean; // True if connection test passed
 }
 
 export interface AppSettings {
