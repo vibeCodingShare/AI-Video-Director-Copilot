@@ -113,9 +113,9 @@ export const translations = {
         privacy: { title: "隐私优先 (BYOK)", desc: "自带 Key 模式。你的创意内容和 API Key 保存在本地，确保绝对隐私。" }
       },
       dev: {
-        title: "高级前端工程师",
-        subtitle: "架构师 & 创作者",
-        quote: "“我开发这个工具是为了让创作者能够拥有顶级工作室所使用的专业前期逻辑。这不仅仅是关于 AI，更是关于利用 AI 遵循成熟的电影理论。”"
+        title: "jovi",
+        subtitle: "Vibe Coder & 创作者",
+        quote: "“我开发这个工具是基于 Vibe Coding 的理念，做一些方便自己和别人使用的小工具，并探索 AI 在电影制作与导演剪辑中的一些尝试。”"
       }
     },
     editor: {
@@ -246,9 +246,9 @@ export const translations = {
         privacy: { title: "BYOK (Privacy First)", desc: "Your content and API keys stay on your machine (Local Storage)." }
       },
       dev: {
-        title: "Senior Frontend Engineer",
-        subtitle: "Architect & Creator",
-        quote: "\"I built this tool to empower creators with professional pre-production logic used in high-end studios.\""
+        title: "jovi",
+        subtitle: "Vibe Coder & Creator",
+        quote: "\"I built this tool using Vibe Coding, creating useful utilities for myself and others while experimenting with AI in film production and director's editing.\""
       }
     },
     editor: {

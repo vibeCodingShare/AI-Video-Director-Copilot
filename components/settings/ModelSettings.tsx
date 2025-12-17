@@ -38,6 +38,13 @@ interface ModelSettingsProps {
     t: any;
 }
 
+const isModelConfigured = (config: ModelConfig) => {
+    if (config.provider === 'jimeng' || config.provider === 'kling') {
+        return !!(config.accessKey && config.secretKey);
+    }
+    return !!config.apiKey;
+};
+
 const ModelConfigEditor: React.FC<{
     config: ModelConfig;
     type: 'text' | 'image';
@@ -75,6 +82,7 @@ const ModelConfigEditor: React.FC<{
     };
 
     const isAkSk = config.provider === 'kling' || config.provider === 'jimeng';
+    const isReady = isModelConfigured(config);
 
     return (
         <div className="bg-surface border border-gray-800 rounded-xl p-6 animate-in fade-in slide-in-from-top-2 shadow-2xl">
@@ -88,13 +96,17 @@ const ModelConfigEditor: React.FC<{
                  </div>
                  <div className="flex gap-2">
                     {!isActiveModel && (
-                        <button onClick={onSetActive} className="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold rounded-lg border border-gray-700 transition-all">
-                           {t.settings.modelEditor.setActive}
+                        <button 
+                            onClick={onSetActive} 
+                            className={`px-4 py-1.5 text-xs font-bold rounded-lg border transition-all ${isReady ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700' : 'bg-amber-900/20 text-amber-500 border-amber-900/50'}`}
+                        >
+                           {isReady ? t.settings.modelEditor.setActive : '未配置 Key'}
                         </button>
                     )}
                     {isActiveModel && (
-                        <div className="px-4 py-1.5 bg-primary/20 text-primary border border-primary/50 text-xs rounded-lg font-bold flex items-center gap-1">
-                            <Zap size={12} /> {t.common.active}
+                        <div className={`px-4 py-1.5 text-xs rounded-lg font-bold flex items-center gap-1 border ${isReady ? 'bg-primary/20 text-primary border-primary/50 shadow-[0_0_15px_rgba(59,130,246,0.2)]' : 'bg-amber-900/40 text-amber-400 border-amber-800'}`}>
+                            {isReady ? <Zap size={12} className="fill-primary" /> : <AlertCircle size={12} />} 
+                            {isReady ? t.common.active : '激活 (未配置 Key)'}
                         </div>
                     )}
                  </div>
@@ -103,11 +115,11 @@ const ModelConfigEditor: React.FC<{
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  <div className="col-span-1 md:col-span-2">
                     <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.displayName}</label>
-                    <input className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-primary outline-none" value={config.name} onChange={e => onUpdate({ name: e.target.value })} />
+                    <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none" value={config.name} onChange={e => onUpdate({ name: e.target.value })} />
                 </div>
                 <div>
                     <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.modelId}</label>
-                    <input className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-primary outline-none font-mono" value={config.modelId} onChange={e => onUpdate({ modelId: e.target.value, verified: false })} />
+                    <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none font-mono" value={config.modelId} onChange={e => onUpdate({ modelId: e.target.value, verified: false })} />
                 </div>
                 {isAkSk ? (
                     <>
@@ -115,14 +127,14 @@ const ModelConfigEditor: React.FC<{
                              <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.accessKey}</label>
                              <div className="relative">
                                 <Key size={14} className="absolute left-3 top-3.5 text-gray-600" />
-                                <input className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.accessKey || ''} onChange={e => onUpdate({ accessKey: e.target.value, verified: false })} />
+                                <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.accessKey || ''} onChange={e => onUpdate({ accessKey: e.target.value, verified: false })} />
                              </div>
                         </div>
                         <div>
                              <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.secretKey}</label>
                              <div className="relative">
                                 <Shield size={14} className="absolute left-3 top-3.5 text-gray-600" />
-                                <input className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.secretKey || ''} onChange={e => onUpdate({ secretKey: e.target.value, verified: false })} />
+                                <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.secretKey || ''} onChange={e => onUpdate({ secretKey: e.target.value, verified: false })} />
                              </div>
                         </div>
                     </>
@@ -131,7 +143,7 @@ const ModelConfigEditor: React.FC<{
                          <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.apiKey}</label>
                          <div className="relative">
                             <Key size={14} className="absolute left-3 top-3.5 text-gray-600" />
-                            <input className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.apiKey} onChange={e => onUpdate({ apiKey: e.target.value, verified: false })} />
+                            <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.apiKey} onChange={e => onUpdate({ apiKey: e.target.value, verified: false })} />
                          </div>
                     </div>
                 )}
@@ -140,7 +152,7 @@ const ModelConfigEditor: React.FC<{
                         <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.baseUrl}</label>
                         <div className="relative">
                             <Globe size={14} className="absolute left-3 top-3.5 text-gray-600" />
-                            <input className="w-full bg-black/50 border border-gray-700 rounded-lg p-3 pl-10 text-sm text-gray-300 focus:border-primary outline-none font-mono" value={config.baseUrl || ''} placeholder="https://api.yourprovider.com/v1" onChange={e => onUpdate({ baseUrl: e.target.value, verified: false })} />
+                            <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-gray-300 focus:border-primary outline-none font-mono" value={config.baseUrl || ''} placeholder="https://api.yourprovider.com/v1" onChange={e => onUpdate({ baseUrl: e.target.value, verified: false })} />
                         </div>
                     </div>
                 )}
@@ -148,7 +160,7 @@ const ModelConfigEditor: React.FC<{
 
             <div className="mt-8 flex items-center justify-between border-t border-gray-800 pt-6">
                  <div className="flex items-center gap-4">
-                     <button onClick={handleTest} disabled={isTesting} className="px-5 py-2.5 bg-white text-black font-black text-xs rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg">
+                     <button onClick={handleTest} disabled={isTesting || !isReady} className="px-5 py-2.5 bg-white text-black font-black text-xs rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center gap-2 shadow-lg">
                         {isTesting ? <RotateCcw size={14} className="animate-spin"/> : <CheckCircle size={14} />}
                         {isTesting ? t.common.testing : t.common.test}
                      </button>
@@ -174,6 +186,7 @@ const ProviderCard: React.FC<{
     isSelected: boolean;
     onClick: () => void;
 }> = ({ preset, config, isActive, isSelected, onClick }) => {
+    const isReady = config ? isModelConfigured(config) : false;
     return (
         <button 
             onClick={onClick} 
@@ -183,29 +196,26 @@ const ProviderCard: React.FC<{
                 : isActive 
                 ? 'bg-primary/10 border-primary' 
                 : config 
-                ? 'bg-surface border-gray-700' 
+                ? 'bg-surface border-gray-800' 
                 : 'bg-black/20 border-gray-800 opacity-60'
             }`}
         >
-            {/* Top row with label and status icons */}
             <div className="flex justify-between items-start w-full mb-1">
                 <div className="text-sm font-black truncate text-white leading-tight pr-2">{preset.label}</div>
                 <div className="flex items-center gap-1 shrink-0">
                     {config?.verified && <CheckCircle size={12} className="text-emerald-500" />}
-                    {isActive && <Zap size={12} className="text-primary fill-primary/30" />}
+                    {isActive && <Zap size={12} className={`text-primary ${isReady ? 'fill-primary' : 'fill-none opacity-50'}`} />}
                 </div>
             </div>
 
-            {/* Description */}
             <div className="text-[10px] text-gray-500 line-clamp-2 leading-tight group-hover:text-gray-400 transition-colors mb-2">
                 {preset.desc}
             </div>
 
-            {/* Status Pills */}
             <div className="mt-auto flex flex-wrap gap-1">
                 {isActive && (
-                    <span className="bg-primary/20 text-primary text-[8px] font-black px-1.5 py-0.5 rounded border border-primary/30 uppercase tracking-tighter">
-                        Active
+                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isReady ? 'bg-primary/20 text-primary border-primary/30' : 'bg-amber-900/40 text-amber-500 border-amber-900/50'}`}>
+                        {isReady ? 'Active' : 'Missing Key'}
                     </span>
                 )}
                 {config?.verified && (
@@ -242,9 +252,16 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
         const activeKey = type === 'text' ? 'activeTextModelId' : 'activeImageModelId';
         setLocalSettings(prev => {
             const newList = prev[key].filter(m => m.id !== id);
-            const newState = { ...prev, [key]: newList };
-            if (prev[activeKey] === id) { (newState as any)[activeKey] = newList[0]?.id || ''; }
-            return newState;
+            
+            // 改进的回退逻辑：如果当前激活的模型被删了
+            let nextActiveId = prev[activeKey];
+            if (prev[activeKey] === id) {
+                // 优先寻找已经配置好 Key 的模型，避免回退到一个完全不可用的模型上
+                const readyModel = newList.find(m => isModelConfigured(m));
+                nextActiveId = readyModel ? readyModel.id : (newList[0]?.id || '');
+            }
+
+            return { ...prev, [key]: newList, [activeKey]: nextActiveId };
         });
         if (type === 'text') setSelectedText(null);
         else setSelectedImage(null);

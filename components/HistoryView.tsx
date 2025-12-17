@@ -3,6 +3,7 @@ import React, { useRef, useMemo } from 'react';
 import { useAppStore } from '../store/AppContext';
 import { Upload, Download, Trash2, ChevronRight, Cpu, Image as ImageIcon, Key, ArrowRight } from 'lucide-react';
 import { translations } from '../translations';
+import { ModelConfig } from '../types';
 
 interface HistoryViewProps {
   currentView: string;
@@ -14,12 +15,20 @@ const HistoryView: React.FC<HistoryViewProps> = ({ currentView, setView }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = translations[settings.language || 'zh'];
 
-  const isConfigured = useMemo(() => {
+  // 判断模型是否已经配置了必要的凭据
+  const isModelReady = (config?: ModelConfig) => {
+    if (!config) return false;
+    if (config.provider === 'jimeng' || config.provider === 'kling') {
+      return !!(config.accessKey && config.secretKey);
+    }
+    return !!config.apiKey;
+  };
+
+  // 只有当文字和图像模型都准备好时，才算“已配置”
+  const isAllConfigured = useMemo(() => {
     const activeTextModel = settings.textModels.find(m => m.id === settings.activeTextModelId);
     const activeImageModel = settings.imageModels.find(m => m.id === settings.activeImageModelId);
-    const textOk = !!activeTextModel?.apiKey || (!!activeTextModel?.accessKey && !!activeTextModel?.secretKey);
-    const imageOk = !!activeImageModel?.apiKey || (!!activeImageModel?.accessKey && !!activeImageModel?.secretKey);
-    return textOk && imageOk;
+    return isModelReady(activeTextModel) && isModelReady(activeImageModel);
   }, [settings]);
 
   const handleExport = () => {
@@ -64,35 +73,37 @@ const HistoryView: React.FC<HistoryViewProps> = ({ currentView, setView }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {projects.length === 0 ? (
-            <div className="p-4 space-y-6">
-                {!isConfigured && (
-                  <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                      <h4 className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-2"><Key size={12} /> {t.onboarding.title}</h4>
-                      <div className="space-y-4">
-                          <div className="flex gap-3">
-                              <div className="bg-gray-800 p-2 rounded-lg shrink-0 h-fit"><Cpu size={14} className="text-blue-400" /></div>
-                              <div>
-                                  <p className="text-xs text-white font-medium mb-1">{t.onboarding.llmTitle}</p>
-                                  <p className="text-[10px] text-gray-500 leading-relaxed">{t.onboarding.llmDesc}</p>
-                              </div>
-                          </div>
-                          <div className="flex gap-3">
-                              <div className="bg-gray-800 p-2 rounded-lg shrink-0 h-fit"><ImageIcon size={14} className="text-pink-400" /></div>
-                              <div>
-                                  <p className="text-xs text-white font-medium mb-1">{t.onboarding.imgTitle}</p>
-                                  <p className="text-[10px] text-gray-500 leading-relaxed">{t.onboarding.imgDesc}</p>
-                              </div>
+        {/* 如果没有任何项目，且模型未配置完成，显示强力引导 */}
+        {projects.length === 0 && !isAllConfigured && (
+          <div className="p-2 mb-4">
+              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 animate-in fade-in slide-in-from-top-4 duration-500 shadow-xl shadow-primary/5">
+                  <h4 className="text-xs font-bold text-primary uppercase mb-3 flex items-center gap-2"><Key size={12} /> {t.onboarding.title}</h4>
+                  <div className="space-y-4">
+                      <div className="flex gap-3">
+                          <div className="bg-gray-800 p-2 rounded-lg shrink-0 h-fit"><Cpu size={14} className="text-blue-400" /></div>
+                          <div>
+                              <p className="text-xs text-white font-medium mb-1">{t.onboarding.llmTitle}</p>
+                              <p className="text-[10px] text-gray-500 leading-relaxed">{t.onboarding.llmDesc}</p>
                           </div>
                       </div>
-                      <button onClick={() => setView('settings')} className="w-full mt-4 bg-primary text-white text-[11px] font-bold py-2 rounded-lg flex items-center justify-center gap-2">
-                          {t.onboarding.action} <ArrowRight size={12}/>
-                      </button>
+                      <div className="flex gap-3">
+                          <div className="bg-gray-800 p-2 rounded-lg shrink-0 h-fit"><ImageIcon size={14} className="text-pink-400" /></div>
+                          <div>
+                              <p className="text-xs text-white font-medium mb-1">{t.onboarding.imgTitle}</p>
+                              <p className="text-[10px] text-gray-500 leading-relaxed">{t.onboarding.imgDesc}</p>
+                          </div>
+                      </div>
                   </div>
-                )}
-                <div className="text-center py-4 text-gray-600 text-[11px] italic">
-                    {isConfigured ? t.onboarding.noProjects : t.onboarding.importHint}
-                </div>
+                  <button onClick={() => setView('settings')} className="w-full mt-4 bg-primary hover:bg-blue-600 text-white text-[11px] font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                      {t.onboarding.action} <ArrowRight size={12}/>
+                  </button>
+              </div>
+          </div>
+        )}
+
+        {projects.length === 0 ? (
+            <div className="text-center py-10 px-4 text-gray-600 text-[11px] italic leading-relaxed">
+                {isAllConfigured ? t.onboarding.noProjects : t.onboarding.importHint}
             </div>
         ) : (
             projects.map(p => {
