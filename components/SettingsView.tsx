@@ -148,7 +148,7 @@ const ModelConfigRow: React.FC<ModelConfigRowProps> = ({
                          <div className="text-[10px] text-gray-500 mt-1 flex flex-wrap gap-2">
                              {config.provider === 'jimeng' && (
                                 <span className="text-primary flex items-center gap-1">
-                                    Default: https://visual.volcengine.com/api/v1/high_aes/cv_20240911/generated_images
+                                    Default: https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images
                                 </span>
                              )}
                              {config.provider === 'kling' && (
@@ -259,7 +259,7 @@ const SettingsView: React.FC = () => {
         const updatedModel = { ...m, ...updates };
         // Auto-fill defaults for Jimeng (Native API)
         if (updates.provider === 'jimeng' && m.provider !== 'jimeng') {
-            updatedModel.baseUrl = 'https://visual.volcengine.com/api/v1/high_aes/cv_20240911/generated_images';
+            updatedModel.baseUrl = 'https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images';
             updatedModel.modelId = 'high_aes_general_v21_L'; // Typical req_key
             if (!updatedModel.name.includes('Jimeng')) updatedModel.name = 'Jimeng (即梦)';
         }

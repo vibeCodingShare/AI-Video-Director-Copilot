@@ -251,7 +251,8 @@ async function signVolcengineRequest(
         'Authorization': authorization,
         'X-Date': amzDate,
         'Content-Type': contentType,
-        'Host': host
+        // Host header is intentionally omitted here as it's forbidden to set in browser fetch
+        // The browser will automatically set it to the URL's host, which matches our signature
     };
 }
 
@@ -260,7 +261,7 @@ const callJimengVisualGen = async (config: ModelConfig, prompt: string): Promise
         throw new Error("Access Key and Secret Key are required for Jimeng (Native API).");
     }
 
-    const fullUrl = config.baseUrl || 'https://visual.volcengine.com/api/v1/high_aes/cv_20240911/generated_images';
+    const fullUrl = config.baseUrl || 'https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images';
     const urlObj = new URL(fullUrl);
     
     const reqBody = {
