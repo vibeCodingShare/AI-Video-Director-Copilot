@@ -124,7 +124,11 @@ export interface ModelConfig {
   verified?: boolean; // True if connection test passed
 }
 
+export type Language = 'zh' | 'en';
+
 export interface AppSettings {
+  language: Language;
+  
   // 1. Basic Settings
   enableIntentAnalysis: boolean;
   autoGenerateImageOnScript: boolean; 

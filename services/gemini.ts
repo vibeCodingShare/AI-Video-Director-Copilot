@@ -16,6 +16,28 @@ const getActiveImageConfig = (settings: AppSettings): ModelConfig | undefined =>
   return settings.imageModels.find(m => m.id === settings.activeImageModelId);
 };
 
+/**
+ * Utility to inject library variables into the main prompt template.
+ * Uses a global regex to ensure all occurrences of {{VAR}} are replaced.
+ */
+const injectVariables = (template: string, settings: AppSettings): string => {
+  let result = template;
+  const mappings: Record<string, string> = {
+    '{{STORYBOARD}}': settings.directorVar_storyboard,
+    '{{CINEMATOGRAPHY}}': settings.directorVar_cinematography,
+    '{{DIRECTOR}}': settings.directorVar_director,
+    '{{CONTINUITY}}': settings.directorVar_continuity,
+  };
+
+  Object.entries(mappings).forEach(([placeholder, value]) => {
+    // Escape special regex chars just in case, though placeholders are simple
+    const regex = new RegExp(placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+    result = result.replace(regex, value);
+  });
+
+  return result;
+};
+
 // --- ORCHESTRATORS ---
 
 const generateText = async (
@@ -32,16 +54,8 @@ const generateText = async (
       return callGoogleGenAI(config, prompt, systemInstruction, jsonMode);
     case 'claude':
       return callAnthropicText(config, prompt, systemInstruction, jsonMode);
-    case 'deepseek':
-    case 'qianwen':
-    case 'moonshot':
-    case 'minimax':
-    case 'grok':
-    case 'openai-compatible':
-    case 'jimeng': // Fallback safe
-    case 'kling': // Fallback safe
     default:
-      // Minimax, Grok, and others support OpenAI compatible endpoints
+      // Handles deepseek, qianwen, moonshot, minimax, grok, and custom openai
       return callOpenAICompatible(config, prompt, systemInstruction, jsonMode);
   }
 };
@@ -76,9 +90,6 @@ export const generateSceneImage = async (
         return await callKlingImageGen(config, fullPrompt);
       case 'openai-compatible':
       default:
-        // DeepSeek/Qianwen/Moonshot/Minimax/Grok/Claude usually don't support standard OpenAI Image API
-        // or require specific handling not yet implemented.
-        // We route to OpenAI Compatible as a catch-all if user manually selects them for image.
         return await callOpenAICompatibleImageGen(config, fullPrompt);
     }
   } catch (error) {
@@ -95,11 +106,12 @@ export const analyzeIntent = async (
 ): Promise<string> => {
   try {
     return await generateText(
-      `Raw User Input: "${rawInput}"\n\n${settings.intentPrompt}`, 
-      settings
+      `User's Raw Creative Content: "${rawInput}"\n\nTask: Analyze this content and extract the creative essence as per the provided Intent Analysis Workflow instructions.`, 
+      settings,
+      settings.intentPrompt
     );
   } catch (error) {
-    console.error("Intent analysis error:", error);
+    console.error("Intent analysis failed, using raw input.", error);
     return rawInput;
   }
 };
@@ -109,33 +121,24 @@ export const generateScript = async (
   settings: AppSettings
 ): Promise<ProjectData> => {
   
-  let systemInstruction = settings.directorMainPrompt;
-  systemInstruction = systemInstruction.replace('{{STORYBOARD}}', settings.directorVar_storyboard);
-  systemInstruction = systemInstruction.replace('{{CINEMATOGRAPHY}}', settings.directorVar_cinematography);
-  systemInstruction = systemInstruction.replace('{{DIRECTOR}}', settings.directorVar_director);
-  systemInstruction = systemInstruction.replace('{{CONTINUITY}}', settings.directorVar_continuity);
+  // 1. Prepare System Instruction with injected knowledge variables
+  const finalSystemInstruction = injectVariables(settings.directorMainPrompt, settings);
 
   const config = getActiveTextConfig(settings);
   
-  // Providers that need explicit JSON prompting or benefit from it
-  const isJsonInstructionNeeded = 
-     config?.provider === 'openai-compatible' || 
-     config?.provider === 'jimeng' ||
-     config?.provider === 'deepseek' ||
-     config?.provider === 'qianwen' ||
-     config?.provider === 'moonshot' ||
-     config?.provider === 'minimax' ||
-     config?.provider === 'grok' ||
-     config?.provider === 'claude';
+  // 2. Adjust for providers that might not handle system roles natively via SDK
+  // or that need JSON format reinforcement
+  let enhancedPrompt = userMessage;
+  const isJsonInstructionNeeded = config?.provider !== 'google'; 
 
   if (isJsonInstructionNeeded) {
-      systemInstruction += "\n\nIMPORTANT: You must respond with raw JSON only. No markdown formatting. No code blocks.";
+      enhancedPrompt += "\n\nCRITICAL: Respond ONLY with valid JSON. No conversational text. No markdown formatting.";
   }
 
   try {
-    const text = await generateText(userMessage, settings, systemInstruction, true);
+    const text = await generateText(enhancedPrompt, settings, finalSystemInstruction, true);
     
-    // Robust JSON cleaning
+    // 3. Robust JSON cleaning for models that still include markdown backticks
     const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(cleanJson) as ProjectData;
   } catch (error) {

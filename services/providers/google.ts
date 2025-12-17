@@ -9,19 +9,22 @@ export const callGoogleGenAI = async (
   jsonMode: boolean = false
 ): Promise<string> => {
   if (!config.apiKey) throw new Error(`API Key missing for ${config.name}`);
+  
   const ai = new GoogleGenAI({ apiKey: config.apiKey });
   
-  const options: any = {
-    systemInstruction,
-  };
+  const genConfig: any = {};
   if (jsonMode) {
-    options.responseMimeType = "application/json";
+    genConfig.responseMimeType = "application/json";
+  }
+  if (systemInstruction) {
+    genConfig.systemInstruction = systemInstruction;
   }
 
+  // Strictly following generateContent parameters
   const response = await ai.models.generateContent({
     model: config.modelId,
     contents: prompt,
-    config: options,
+    config: genConfig,
   });
 
   return response.text || "";
@@ -31,6 +34,7 @@ export const callGoogleImageGen = async (config: ModelConfig, prompt: string): P
    if (!config.apiKey) throw new Error(`API Key missing for ${config.name}`);
    const ai = new GoogleGenAI({ apiKey: config.apiKey });
    
+   // image generation with nano banana series models
    const response = await ai.models.generateContent({
       model: config.modelId,
       contents: prompt,
@@ -41,5 +45,5 @@ export const callGoogleImageGen = async (config: ModelConfig, prompt: string): P
         return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
       }
     }
-    throw new Error("No image data found in Google response");
+    throw new Error("No image data found in Google response parts");
 };

@@ -24,6 +24,7 @@ export const callOpenAICompatible = async (
   const body: any = {
     model: config.modelId,
     messages: messages,
+    max_tokens: 4000, // Sufficient for detailed shooting scripts
   };
 
   if (jsonMode) {

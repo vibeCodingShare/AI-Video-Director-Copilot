@@ -128,6 +128,8 @@ const DEFAULT_IMAGE_MODELS: ModelConfig[] = [
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  language: 'zh',
+  
   // Basic
   enableIntentAnalysis: true,
   autoGenerateImageOnScript: false,

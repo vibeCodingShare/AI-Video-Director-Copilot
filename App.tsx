@@ -6,27 +6,25 @@ import ProjectInput from './components/ProjectInput';
 import ScriptBoard from './components/ScriptBoard';
 import EditingTimeline from './components/EditingTimeline';
 import SettingsView from './components/SettingsView';
+import AboutView from './components/AboutView';
 import { LayoutGrid, Scissors } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { currentProjectId } = useAppStore();
   
-  // View state: 'create' | 'settings' | 'script' | 'edit'
-  // 'script' and 'edit' are sub-views of a selected project
-  const [view, setViewState] = useState<'create' | 'script' | 'edit' | 'settings'>(() => {
+  // View state: 'create' | 'settings' | 'script' | 'edit' | 'about'
+  const [view, setViewState] = useState<'create' | 'script' | 'edit' | 'settings' | 'about'>(() => {
     return (localStorage.getItem('vdc_activeView') as any) || 'create';
   });
 
-  const setView = (v: 'create' | 'script' | 'edit' | 'settings') => {
+  const setView = (v: 'create' | 'script' | 'edit' | 'settings' | 'about') => {
     setViewState(v);
     localStorage.setItem('vdc_activeView', v);
   };
 
-  // If we are in project mode (script/edit), we show the Tabs at the top of the main area
   const showProjectTabs = currentProjectId && (view === 'script' || view === 'edit');
 
   useEffect(() => {
-     // If user deleted the current project, fallback to create
      if (!currentProjectId && (view === 'script' || view === 'edit')) {
          setView('create');
      }
@@ -38,10 +36,10 @@ const AppContent: React.FC = () => {
         <ProjectInput onSuccess={() => setView('script')} />
       )}
       {view === 'settings' && <SettingsView />}
+      {view === 'about' && <AboutView />}
       
       {showProjectTabs && (
         <div className="flex flex-col h-full">
-            {/* Project Tabs */}
             <div className="flex items-center px-6 pt-4 border-b border-gray-800 bg-surface/30 backdrop-blur-sm gap-8 shrink-0">
                 <button 
                     onClick={() => setView('script')}
@@ -67,7 +65,6 @@ const AppContent: React.FC = () => {
                 </button>
             </div>
 
-            {/* Content Area */}
             <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-black/20">
                 {view === 'script' && <ScriptBoard />}
                 {view === 'edit' && <EditingTimeline />}
