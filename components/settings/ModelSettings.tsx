@@ -5,6 +5,8 @@ import { AppSettings, ModelConfig, ModelProvider } from '../../types';
 import { callGoogleGenAI, callGoogleImageGen } from '../../services/providers/google';
 import { callAnthropicText } from '../../services/providers/anthropic';
 import { callOpenAICompatible, callOpenAICompatibleImageGen } from '../../services/providers/openai';
+import { callJimengVisualGen } from '../../services/providers/jimeng';
+import { callKlingImageGen } from '../../services/providers/kling';
 
 interface ProviderPreset {
     value: ModelProvider;
@@ -67,9 +69,17 @@ const ModelConfigEditor: React.FC<{
                 else if (config.provider === 'claude') await callAnthropicText(config, "Hello");
                 else await callOpenAICompatible(config, "Hello");
             } else {
-                if (config.provider === 'google') await callGoogleImageGen(config, "A single red cube");
-                else if (config.provider === 'openai-compatible') await callOpenAICompatibleImageGen(config, "A single red cube");
-                else throw new Error("This provider requires backend proxy for testing.");
+                if (config.provider === 'google') {
+                    await callGoogleImageGen(config, "A single red cube");
+                } else if (config.provider === 'jimeng') {
+                    await callJimengVisualGen(config, "A single red cube");
+                } else if (config.provider === 'kling') {
+                    await callKlingImageGen(config, "A single red cube");
+                } else if (config.provider === 'openai-compatible') {
+                    await callOpenAICompatibleImageGen(config, "A single red cube");
+                } else {
+                    throw new Error("Provider not supported for test.");
+                }
             }
             setTestResult({ success: true, msg: "Connection OK" });
             onSetVerified(true);
