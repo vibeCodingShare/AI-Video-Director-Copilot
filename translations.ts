@@ -2,7 +2,7 @@
 export const translations = {
   zh: {
     common: {
-      save: "保存",
+      save: "别忘了保存",
       cancel: "取消",
       delete: "删除",
       confirm: "确认",
@@ -135,7 +135,7 @@ export const translations = {
   },
   en: {
     common: {
-      save: "Save",
+      save: "Don't forget to save",
       cancel: "Cancel",
       delete: "Delete",
       confirm: "Confirm",

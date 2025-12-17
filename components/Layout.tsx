@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/AppContext';
-import { Video, Settings, PlusCircle, Menu, PanelLeftClose, PanelLeftOpen, X, Info } from 'lucide-react';
+import { Video, Settings, PlusCircle, Menu, PanelLeftClose, PanelLeftOpen, X, Sparkles } from 'lucide-react';
 import HistoryView from './HistoryView';
 import { translations } from '../translations';
 
@@ -24,56 +24,74 @@ const Layout: React.FC<LayoutProps> = ({ view, setView, children }) => {
   return (
     <div className="flex flex-col h-screen bg-background text-gray-300 font-sans overflow-hidden">
       
-      <header className="h-16 border-b border-gray-800 bg-surface flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
-        <div className="flex items-center gap-3 text-white">
+      <header className="h-16 border-b border-gray-800 bg-surface/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 shrink-0 z-20">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => setMobileMenuOpen(true)} 
-            className="md:hidden p-1 text-gray-400 hover:text-white"
+            className="md:hidden p-1.5 text-gray-400 hover:text-white transition-colors"
           >
             <Menu size={20} />
           </button>
 
           <button 
             onClick={() => setSidebarOpen(!isSidebarOpen)} 
-            className="hidden md:block text-gray-400 hover:text-white transition-colors"
+            className="hidden md:block text-gray-500 hover:text-white transition-colors p-1.5 hover:bg-white/5 rounded-lg"
             title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
           >
-             {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+             {isSidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           </button>
 
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setView('create')}>
-            <div className="bg-primary p-1.5 rounded-lg">
-                <Video size={20} className="text-white" />
+          <div className="flex items-center gap-2 cursor-pointer group px-2" onClick={() => setView('create')}>
+            <div className="bg-primary/10 p-1.5 rounded-lg group-hover:bg-primary/20 transition-all">
+                <Video size={18} className="text-primary" />
             </div>
-            <span className="font-bold text-lg tracking-tight hidden sm:inline">Director.ai</span>
+            <span className="font-black text-lg tracking-tighter text-white hidden sm:inline">Director.ai</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex items-center gap-1.5 md:gap-2">
+          {/* Action: New Project - Primary CTA */}
           <button
             onClick={() => { setCurrentProjectId(null); setView('create'); }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${view === 'create' && !currentProjectId ? 'bg-primary text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all text-xs font-bold border ${
+              view === 'create' && !currentProjectId 
+              ? 'bg-primary border-primary text-white shadow-lg shadow-primary/20' 
+              : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/20'
+            }`}
           >
-            <PlusCircle size={16} />
+            <PlusCircle size={14} />
             <span className="hidden sm:inline">{t.common.newProject}</span>
           </button>
           
-          <button
-            onClick={() => setView('settings')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${view === 'settings' ? 'bg-primary text-white' : 'bg-gray-800 hover:bg-gray-700 text-gray-300'}`}
-          >
-            <Settings size={16} />
-            <span className="hidden sm:inline">{t.common.config}</span>
-          </button>
+          <div className="w-px h-6 bg-gray-800 mx-1 hidden sm:block"></div>
 
-          <button
-            onClick={() => setView('about')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors text-sm font-medium ${view === 'about' ? 'bg-white/10 text-white' : 'bg-gray-800/40 hover:bg-gray-800 text-gray-400 hover:text-gray-200 border border-transparent'}`}
-            title={t.common.about}
-          >
-            <Info size={16} />
-            <span className="hidden sm:inline">{t.common.about}</span>
-          </button>
+          {/* Utility Nav Group */}
+          <div className="flex items-center bg-black/30 border border-gray-800 rounded-xl p-1">
+              <button
+                onClick={() => setView('settings')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${
+                  view === 'settings' 
+                  ? 'bg-gray-800 text-white shadow-sm' 
+                  : 'text-gray-500 hover:text-gray-300'
+                }`}
+              >
+                <Settings size={14} />
+                <span className="hidden sm:inline">{t.common.config}</span>
+              </button>
+
+              <button
+                onClick={() => setView('about')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all text-xs font-bold ${
+                  view === 'about' 
+                  ? 'bg-gray-800 text-white shadow-sm' 
+                  : 'text-gray-500 hover:text-gray-300'
+                }`}
+                title={t.common.about}
+              >
+                <Sparkles size={14} />
+                <span className="hidden sm:inline">{t.common.about}</span>
+              </button>
+          </div>
         </div>
       </header>
 

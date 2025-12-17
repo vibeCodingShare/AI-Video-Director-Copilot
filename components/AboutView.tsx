@@ -108,7 +108,7 @@ const AboutView: React.FC = () => {
                             <div className="relative bg-white p-3 rounded-2xl shadow-2xl transition-all duration-500 group-hover/qr:scale-105 group-hover/qr:rotate-1 group-hover/qr:shadow-primary/20">
                                 {!imgError ? (
                                     <img 
-                                        src="/coffee.png?v=3"
+                                        src="/coffee.png"
                                         alt="Support QR Code" 
                                         className="w-40 h-40 md:w-48 md:h-48 rounded-xl object-contain block"
                                         onError={() => setImgError(true)}
