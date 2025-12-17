@@ -210,6 +210,7 @@ async function signVolcengineRequest(
     // 1. Canonical Request
     const canonicalUri = path;
     const canonicalQueryString = query; // Assuming already sorted or empty
+    // IMPORTANT: Host header is included in signature calculation
     const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-date:${amzDate}\n`;
     const signedHeaders = "content-type;host;x-date";
     const payloadHash = await sha256(body);
@@ -251,8 +252,8 @@ async function signVolcengineRequest(
         'Authorization': authorization,
         'X-Date': amzDate,
         'Content-Type': contentType,
-        // Host header is intentionally omitted here as it's forbidden to set in browser fetch
-        // The browser will automatically set it to the URL's host, which matches our signature
+        // Host header MUST NOT be in the returned object for browser fetch
+        // The browser sets it automatically to the connection host.
     };
 }
 
@@ -261,13 +262,14 @@ const callJimengVisualGen = async (config: ModelConfig, prompt: string): Promise
         throw new Error("Access Key and Secret Key are required for Jimeng (Native API).");
     }
 
+    // Default to correct Public API endpoint: visual.volcengineapi.com
     const fullUrl = config.baseUrl || 'https://visual.volcengineapi.com/api/v1/high_aes/cv_20240911/generated_images';
     const urlObj = new URL(fullUrl);
     
     const reqBody = {
-        req_key: config.modelId || "high_aes_general_v21_L", // Default to V2.1 if not specified
+        req_key: config.modelId || "high_aes_general_v21_L", // Default to V2.1
         prompt: prompt,
-        model_version: "general_v2.1_L", // Usually implied by req_key, but helpful to be explicit if known
+        model_version: "general_v2.1_L", 
         return_url: false, // We want base64 for immediate display
         logo_info: {
              add_logo: false
@@ -276,13 +278,14 @@ const callJimengVisualGen = async (config: ModelConfig, prompt: string): Promise
 
     const bodyStr = JSON.stringify(reqBody);
     
+    // Sign the request
     const signedHeaders = await signVolcengineRequest(
         config.accessKey,
         config.secretKey,
         "POST",
-        urlObj.host,
+        urlObj.host, // Used for signature calculation
         urlObj.pathname,
-        urlObj.search.slice(1), // remove '?'
+        urlObj.search.slice(1), 
         "application/json",
         bodyStr
     );
