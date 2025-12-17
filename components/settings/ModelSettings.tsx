@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Cpu, Image as ImageIcon, CheckCircle, Zap, Key, Shield, Globe, RotateCcw, Trash2, AlertCircle } from 'lucide-react';
 import { AppSettings, ModelConfig, ModelProvider } from '../../types';
@@ -72,8 +71,10 @@ const ModelConfigEditor: React.FC<{
                 if (config.provider === 'google') {
                     await callGoogleImageGen(config, "A single red cube");
                 } else if (config.provider === 'jimeng') {
+                    // 直接调用服务函数，不再拦截报错
                     await callJimengVisualGen(config, "A single red cube");
                 } else if (config.provider === 'kling') {
+                    // 直接调用服务函数，不再拦截报错
                     await callKlingImageGen(config, "A single red cube");
                 } else if (config.provider === 'openai-compatible') {
                     await callOpenAICompatibleImageGen(config, "A single red cube");
