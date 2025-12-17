@@ -286,6 +286,13 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
                         <Cpu size={24} className="text-blue-400" /> {t.settings.llmModels}
                     </h2>
                     <p className="text-gray-500 text-sm mt-1">Configure language models for scriptwriting and creative direction.</p>
+                    <div className="mt-3">
+                        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 max-w-4xl">
+                            <p className="text-gray-300 text-xs leading-relaxed">
+                                💡 <span className="font-semibold">提示：</span>使用更强的基础模型可以获得更明显的效果提升
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                     {TEXT_PROVIDERS.map(p => {
@@ -325,6 +332,13 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
                         <ImageIcon size={24} className="text-pink-400" /> {t.settings.imgModels}
                     </h2>
                     <p className="text-gray-500 text-sm mt-1">Configure AI image generators for your storyboard visuals.</p>
+                    <div className="mt-3">
+                        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 max-w-4xl">
+                            <p className="text-gray-300 text-xs leading-relaxed">
+                                💡 <span className="font-semibold">提示：</span>使用更强的基础模型可以获得更明显的效果提升
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                     {IMAGE_PROVIDERS.map(p => {
