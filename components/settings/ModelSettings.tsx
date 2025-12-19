@@ -1,13 +1,12 @@
 
 import React, { useState } from 'react';
-import { Cpu, Image as ImageIcon, CheckCircle, Zap, Key, Shield, Globe, RotateCcw, Trash2, AlertCircle, ChevronDown, Info, ShieldAlert, ExternalLink } from 'lucide-react';
+import { Cpu, Image as ImageIcon, CheckCircle, Zap, Key, Shield, Globe, RotateCcw, Trash2, AlertCircle, ChevronDown, Info, ShieldAlert, ExternalLink, RefreshCw } from 'lucide-react';
 import { AppSettings, ModelConfig, ModelProvider } from '../../types';
 import { callGoogleGenAI, callGoogleImageGen } from '../../services/providers/google';
 import { callAnthropicText } from '../../services/providers/anthropic';
 import { callOpenAICompatible, callOpenAICompatibleImageGen } from '../../services/providers/openai';
 import { callJimengVisualGen } from '../../services/providers/jimeng';
 import { callKlingImageGen } from '../../services/providers/kling';
-import { callQianwenImageGen } from '../../services/providers/qianwen';
 
 interface ProviderPreset {
     value: ModelProvider;
@@ -22,7 +21,7 @@ const TEXT_PROVIDERS: ProviderPreset[] = [
     { value: 'deepseek', label: 'DeepSeek', defaultBaseUrl: 'https://api.deepseek.com', defaultModelId: 'deepseek-chat', desc: 'Coding & Reason' },
     { value: 'claude', label: 'Claude', defaultBaseUrl: 'https://api.anthropic.com/v1', defaultModelId: 'claude-3-5-sonnet-latest', desc: 'Nuance & Creative' },
     { value: 'openai-compatible', label: 'OpenAI / Generic', defaultBaseUrl: 'https://api.openai.com/v1', defaultModelId: 'gpt-4o', desc: 'Industry Standard' },
-    { value: 'qianwen', label: 'Qwen (通义千问)', defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModelId: 'qwen-plus', desc: 'Balanced Performance' },
+    { value: 'qianwen', label: 'Qwen (通义千问 LLM)', defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModelId: 'qwen-plus', desc: 'DashScope LLM' },
     { value: 'moonshot', label: 'Moonshot (Kimi)', defaultBaseUrl: 'https://api.moonshot.cn/v1', defaultModelId: 'moonshot-v1-8k', desc: 'Long Context' },
     { value: 'minimax', label: 'Minimax', defaultBaseUrl: 'https://api.minimax.chat/v1', defaultModelId: 'abab6.5s-chat', desc: 'Creative Writing' },
     { value: 'grok', label: 'Grok', defaultBaseUrl: 'https://api.x.ai/v1', defaultModelId: 'grok-beta', desc: 'Unfiltered Logic' },
@@ -30,23 +29,27 @@ const TEXT_PROVIDERS: ProviderPreset[] = [
 
 const IMAGE_PROVIDERS: ProviderPreset[] = [
     { value: 'google', label: 'Google Gemini', defaultModelId: 'gemini-2.5-flash-image', desc: 'Native Image Gen' },
-    { value: 'qianwen', label: 'Qwen (通义万相)', defaultBaseUrl: 'https://dashscope.aliyuncs.com/api/v1', defaultModelId: 'wan2.6-t2i', desc: 'High Quality Generation' },
     { value: 'jimeng', label: 'Jimeng (即梦)', defaultBaseUrl: 'https://visual.volcengineapi.com', defaultModelId: 'jimeng_t2i_v40', desc: 'Cinematic Quality' },
     { value: 'kling', label: 'Kling AI (可灵)', defaultBaseUrl: 'https://api-beijing.klingai.com', defaultModelId: 'kling-v1', desc: 'Professional Visuals' },
     { value: 'openai-compatible', label: 'DALL-E / Generic', defaultBaseUrl: 'https://api.openai.com/v1', defaultModelId: 'dall-e-3', desc: 'Standard Image API' },
 ];
 
-const MODEL_ID_PRESETS: Record<ModelProvider, string[]> = {
-    'google': ['gemini-3-flash-preview', 'gemini-3-pro-preview', 'gemini-3-pro-image-preview', 'gemini-2.5-flash-image'],
-    'kling': ['kling-image-o1', 'kling-v2-1', 'kling-v2', 'kling-v1-5', 'kling-v1', 'kling-v2-new'],
-    'jimeng': ['jimeng_t2i_v40', 'jimeng_t2i_v35', 'jimeng_t2i_v30'],
-    'qianwen': ['wan2.6-t2i', 'wan2.5-t2i-preview', 'wan2.2-t2i-plus', 'qwen-image-plus'],
+const TEXT_MODEL_ID_PRESETS: Record<string, string[]> = {
+    'google': ['gemini-3-flash-preview', 'gemini-3-pro-preview'],
+    'qianwen': ['qwen-max', 'qwen-plus', 'qwen-turbo', 'qwen-long'],
     'deepseek': ['deepseek-chat', 'deepseek-reasoner'],
-    'claude': ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest'],
-    'openai-compatible': ['gpt-4o', 'gpt-4o-mini', 'dall-e-3', 'dall-e-2'],
-    'moonshot': ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
-    'minimax': ['abab6.5s-chat', 'abab6.5-chat'],
-    'grok': ['grok-beta', 'grok-2'],
+    'claude': ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
+    'openai-compatible': ['gpt-4o', 'gpt-4o-mini'],
+    'moonshot': ['moonshot-v1-8k', 'moonshot-v1-32k'],
+    'minimax': ['abab6.5s-chat'],
+    'grok': ['grok-beta'],
+};
+
+const IMAGE_MODEL_ID_PRESETS: Record<string, string[]> = {
+    'google': ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'],
+    'kling': ['kling-v1', 'kling-v2-1', 'kling-image-o1'],
+    'jimeng': ['jimeng_t2i_v40', 'jimeng_t2i_v35'],
+    'openai-compatible': ['dall-e-3'],
 };
 
 interface ModelSettingsProps {
@@ -84,19 +87,11 @@ const ModelConfigEditor: React.FC<{
                 else if (config.provider === 'claude') await callAnthropicText(config, "Hello");
                 else await callOpenAICompatible(config, "Hello");
             } else {
-                if (config.provider === 'google') {
-                    await callGoogleImageGen(config, "A single red cube");
-                } else if (config.provider === 'jimeng') {
-                    await callJimengVisualGen(config, "A single red cube");
-                } else if (config.provider === 'kling') {
-                    await callKlingImageGen(config, "A single red cube");
-                } else if (config.provider === 'qianwen') {
-                    await callQianwenImageGen(config, "A single red cube");
-                } else if (config.provider === 'openai-compatible') {
-                    await callOpenAICompatibleImageGen(config, "A single red cube");
-                } else {
-                    throw new Error("Provider not supported for test.");
-                }
+                if (config.provider === 'google') await callGoogleImageGen(config, "A single red cube");
+                else if (config.provider === 'jimeng') await callJimengVisualGen(config, "A single red cube");
+                else if (config.provider === 'kling') await callKlingImageGen(config, "A single red cube");
+                else if (config.provider === 'openai-compatible') await callOpenAICompatibleImageGen(config, "A single red cube");
+                else throw new Error("Provider not supported for test.");
             }
             setTestResult({ success: true, msg: "Connection OK" });
             onSetVerified(true);
@@ -110,7 +105,7 @@ const ModelConfigEditor: React.FC<{
 
     const isAkSk = config.provider === 'kling' || config.provider === 'jimeng';
     const isReady = isModelConfigured(config);
-    const presets = MODEL_ID_PRESETS[config.provider] || [];
+    const presets = type === 'text' ? TEXT_MODEL_ID_PRESETS[config.provider] : IMAGE_MODEL_ID_PRESETS[config.provider] || [];
 
     return (
         <div className="bg-surface border border-gray-800 rounded-xl p-6 animate-in fade-in slide-in-from-top-2 shadow-2xl">
@@ -124,10 +119,7 @@ const ModelConfigEditor: React.FC<{
                  </div>
                  <div className="flex gap-2">
                     {!isActiveModel && (
-                        <button 
-                            onClick={onSetActive} 
-                            className={`px-4 py-1.5 text-xs font-bold rounded-lg border transition-all ${isReady ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700' : 'bg-amber-900/20 text-amber-500 border-amber-900/50'}`}
-                        >
+                        <button onClick={onSetActive} className={`px-4 py-1.5 text-xs font-bold rounded-lg border transition-all ${isReady ? 'bg-gray-800 hover:bg-gray-700 text-white border-gray-700' : 'bg-amber-900/20 text-amber-500 border-amber-900/50'}`}>
                            {isReady ? t.settings.modelEditor.setActive : '未配置 Key'}
                         </button>
                     )}
@@ -150,19 +142,11 @@ const ModelConfigEditor: React.FC<{
                     <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.modelId}</label>
                     <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <input 
-                                className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none font-mono" 
-                                value={config.modelId} 
-                                onChange={e => onUpdate({ modelId: e.target.value, verified: false })} 
-                            />
+                            <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none font-mono" value={config.modelId} onChange={e => onUpdate({ modelId: e.target.value, verified: false })} />
                         </div>
-                        {presets.length > 0 && (
+                        {presets && presets.length > 0 && (
                             <div className="relative">
-                                <select 
-                                    className="h-full bg-gray-800 border border-gray-700 rounded-lg px-3 text-xs text-gray-300 font-bold focus:border-primary outline-none appearance-none pr-8 cursor-pointer"
-                                    value=""
-                                    onChange={(e) => e.target.value && onUpdate({ modelId: e.target.value, verified: false })}
-                                >
+                                <select className="h-full bg-gray-800 border border-gray-700 rounded-lg px-3 text-xs text-gray-300 font-bold focus:border-primary outline-none appearance-none pr-8 cursor-pointer" value="" onChange={(e) => e.target.value && onUpdate({ modelId: e.target.value, verified: false })}>
                                     <option value="" disabled>选择预设</option>
                                     {presets.map(p => <option key={p} value={p}>{p}</option>)}
                                 </select>
@@ -191,7 +175,9 @@ const ModelConfigEditor: React.FC<{
                     </>
                 ) : (
                     <div>
-                         <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.apiKey}</label>
+                         <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">
+                            {t.settings.modelEditor.apiKey}
+                         </label>
                          <div className="relative">
                             <Key size={14} className="absolute left-3 top-3.5 text-gray-600" />
                             <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-white focus:border-primary outline-none font-mono" type="password" value={config.apiKey} onChange={e => onUpdate({ apiKey: e.target.value, verified: false })} />
@@ -204,38 +190,21 @@ const ModelConfigEditor: React.FC<{
                         <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.baseUrl}</label>
                         <div className="relative">
                             <Globe size={14} className="absolute left-3 top-3.5 text-gray-600" />
-                            <input 
-                                className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-gray-300 focus:border-primary outline-none font-mono" 
-                                value={config.baseUrl || ''} 
-                                placeholder={config.provider === 'kling' ? 'https://api-beijing.klingai.com' : 'https://api.yourprovider.com/v1'} 
-                                onChange={e => onUpdate({ baseUrl: e.target.value, verified: false })} 
-                            />
+                            <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-gray-300 focus:border-primary outline-none font-mono" value={config.baseUrl || ''} placeholder={config.provider === 'kling' ? 'https://api-beijing.klingai.com' : 'https://api.yourprovider.com/v1'} onChange={e => onUpdate({ baseUrl: e.target.value, verified: false })} />
                         </div>
                         
-                        {config.provider === 'kling' && (
+                        {(config.provider === 'kling' || config.provider === 'qianwen') && (
                             <div className="mt-4 p-4 bg-amber-900/10 border border-amber-900/30 rounded-xl space-y-4">
                                 <h4 className="text-[11px] font-bold text-amber-500 uppercase flex items-center gap-2">
-                                    <ShieldAlert size={14} /> 跨域 (CORS) 与 401 彻底解决
+                                    <ShieldAlert size={14} /> 访问建议
                                 </h4>
                                 <div className="text-[10px] text-gray-400 leading-relaxed space-y-3">
                                     <div className="p-2 bg-black/40 rounded-lg border border-amber-900/20">
-                                        <p className="font-bold text-gray-200 mb-1">1. 跨域拦截解决</p>
-                                        <p>可灵 API 不允许浏览器直连。请修改 Base URL，在地址前增加跨域代理前缀：</p>
-                                        <code className="text-white block mt-1 bg-black p-1 rounded break-all">https://cors-anywhere.herokuapp.com/https://api-beijing.klingai.com</code>
-                                        <p className="mt-1 italic opacity-70">注：首次使用代理需访问 herokuapp 官网并点击 "Get temporary access"。</p>
-                                    </div>
-                                    <div className="p-2 bg-black/40 rounded-lg border border-amber-900/20">
-                                        <p className="font-bold text-gray-200 mb-1">2. 解决 401 Unauthorized</p>
-                                        <p>若遇到 401，请确认 AK/SK 无误且无多余空格。本系统已严格按照官方 JWT 标准（iss, exp, nbf）实现。</p>
-                                    </div>
-                                    <div className="p-2 bg-black/40 rounded-lg border border-amber-900/20">
-                                        <p className="font-bold text-gray-200 mb-1">3. 默认域名建议</p>
-                                        <p>国内集群请优先使用：<code className="text-white">https://api-beijing.klingai.com</code></p>
+                                        <p className="font-bold text-gray-200 mb-1">解决跨域 (CORS)</p>
+                                        <p>浏览器请求这些 API 常被拦截。建议使用跨域代理前缀：</p>
+                                        <code className="text-white block mt-1 bg-black p-1 rounded break-all">https://cors-anywhere.herokuapp.com/[原地址]</code>
                                     </div>
                                 </div>
-                                <a href="https://app.klingai.com/cn/dev/document-api/apiReference/commonInfo" target="_blank" className="inline-flex items-center gap-1 text-[10px] text-primary font-bold hover:underline">
-                                    查看可灵官方文档 <ExternalLink size={10} />
-                                </a>
                             </div>
                         )}
                     </div>
@@ -272,18 +241,7 @@ const ProviderCard: React.FC<{
 }> = ({ preset, config, isActive, isSelected, onClick }) => {
     const isReady = config ? isModelConfigured(config) : false;
     return (
-        <button 
-            onClick={onClick} 
-            className={`group p-4 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col min-h-[90px] ${
-                isSelected 
-                ? 'bg-white/10 border-white ring-1 ring-white shadow-xl shadow-white/5' 
-                : isActive 
-                ? 'bg-primary/10 border-primary' 
-                : config 
-                ? 'bg-surface border-gray-800' 
-                : 'bg-black/20 border-gray-800 opacity-60'
-            }`}
-        >
+        <button onClick={onClick} className={`group p-4 rounded-xl border text-left transition-all relative overflow-hidden flex flex-col min-h-[90px] ${isSelected ? 'bg-white/10 border-white ring-1 ring-white shadow-xl shadow-white/5' : isActive ? 'bg-primary/10 border-primary' : config ? 'bg-surface border-gray-800' : 'bg-black/20 border-gray-800 opacity-60'}`}>
             <div className="flex justify-between items-start w-full mb-1">
                 <div className="text-sm font-black truncate text-white leading-tight pr-2">{preset.label}</div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -291,11 +249,7 @@ const ProviderCard: React.FC<{
                     {isActive && <Zap size={12} className={`text-primary ${isReady ? 'fill-primary' : 'fill-none opacity-50'}`} />}
                 </div>
             </div>
-
-            <div className="text-[10px] text-gray-500 line-clamp-2 leading-tight group-hover:text-gray-400 transition-colors mb-2">
-                {preset.desc}
-            </div>
-
+            <div className="text-[10px] text-gray-500 line-clamp-2 leading-tight group-hover:text-gray-400 transition-colors mb-2">{preset.desc}</div>
             <div className="mt-auto flex flex-wrap gap-1">
                 {isActive && (
                     <span className={`text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-tighter ${isReady ? 'bg-primary/20 text-primary border-primary/30' : 'bg-amber-900/40 text-amber-500 border-amber-900/50'}`}>
@@ -303,9 +257,7 @@ const ProviderCard: React.FC<{
                     </span>
                 )}
                 {config?.verified && (
-                    <span className="bg-emerald-500/10 text-emerald-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase tracking-tighter">
-                        Verified
-                    </span>
+                    <span className="bg-emerald-500/10 text-emerald-500 text-[8px] font-black px-1.5 py-0.5 rounded border border-emerald-500/20 uppercase tracking-tighter">Verified</span>
                 )}
             </div>
         </button>
@@ -336,15 +288,11 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
         const activeKey = type === 'text' ? 'activeTextModelId' : 'activeImageModelId';
         setLocalSettings(prev => {
             const newList = prev[key].filter(m => m.id !== id);
-            
-            // 改进的回退逻辑：如果当前激活的模型被删了
             let nextActiveId = prev[activeKey];
             if (prev[activeKey] === id) {
-                // 优先寻找已经配置好 Key 的模型，避免回退到一个完全不可用的模型上
                 const readyModel = newList.find(m => isModelConfigured(m));
                 nextActiveId = readyModel ? readyModel.id : (newList[0]?.id || '');
             }
-
             return { ...prev, [key]: newList, [activeKey]: nextActiveId };
         });
         if (type === 'text') setSelectedText(null);
@@ -364,34 +312,12 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
                     {TEXT_PROVIDERS.map(p => {
                         const cfg = localSettings.textModels.find(m => m.provider === p.value);
                         const isActive = cfg?.id === localSettings.activeTextModelId;
-                        return (
-                            <ProviderCard 
-                                key={p.value}
-                                preset={p}
-                                config={cfg}
-                                isActive={isActive}
-                                isSelected={selectedText === p.value}
-                                onClick={() => setSelectedText(p.value)}
-                            />
-                        );
+                        return <ProviderCard key={p.value} preset={p} config={cfg} isActive={isActive} isSelected={selectedText === p.value} onClick={() => setSelectedText(p.value)} />;
                     })}
                 </div>
-                {selectedText && (
-                    <ModelConfigEditor 
-                        t={t} 
-                        type="text" 
-                        config={getOrCreateModel('text', TEXT_PROVIDERS.find(p => p.value === selectedText)!)} 
-                        onUpdate={up => updateConfig('text', localSettings.textModels.find(m => m.provider === selectedText)!.id, up)} 
-                        onDelete={() => deleteConfig('text', localSettings.textModels.find(m => m.provider === selectedText)!.id)} 
-                        onSetVerified={v => updateConfig('text', localSettings.textModels.find(m => m.provider === selectedText)!.id, { verified: v })} 
-                        onSetActive={() => setLocalSettings(p => ({ ...p, activeTextModelId: p.textModels.find(m => m.provider === selectedText)!.id }))} 
-                        isActiveModel={localSettings.activeTextModelId === localSettings.textModels.find(m => m.provider === selectedText)?.id} 
-                    />
-                )}
+                {selectedText && <ModelConfigEditor t={t} type="text" config={getOrCreateModel('text', TEXT_PROVIDERS.find(p => p.value === selectedText)!)} onUpdate={up => updateConfig('text', localSettings.textModels.find(m => m.provider === selectedText)!.id, up)} onDelete={() => deleteConfig('text', localSettings.textModels.find(m => m.provider === selectedText)!.id)} onSetVerified={v => updateConfig('text', localSettings.textModels.find(m => m.provider === selectedText)!.id, { verified: v })} onSetActive={() => setLocalSettings(p => ({ ...p, activeTextModelId: p.textModels.find(m => m.provider === selectedText)!.id }))} isActiveModel={localSettings.activeTextModelId === localSettings.textModels.find(m => m.provider === selectedText)?.id} />}
             </section>
-
             <div className="h-px bg-gray-800/50"></div>
-
             <section>
                 <div className="mb-6">
                     <h2 className="text-2xl font-black text-white flex items-center gap-3">
@@ -403,30 +329,10 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
                     {IMAGE_PROVIDERS.map(p => {
                         const cfg = localSettings.imageModels.find(m => m.provider === p.value);
                         const isActive = cfg?.id === localSettings.activeImageModelId;
-                        return (
-                            <ProviderCard 
-                                key={p.value}
-                                preset={p}
-                                config={cfg}
-                                isActive={isActive}
-                                isSelected={selectedImage === p.value}
-                                onClick={() => setSelectedImage(p.value)}
-                            />
-                        );
+                        return <ProviderCard key={p.value} preset={p} config={cfg} isActive={isActive} isSelected={selectedImage === p.value} onClick={() => setSelectedImage(p.value)} />;
                     })}
                 </div>
-                {selectedImage && (
-                    <ModelConfigEditor 
-                        t={t} 
-                        type="image" 
-                        config={getOrCreateModel('image', IMAGE_PROVIDERS.find(p => p.value === selectedImage)!)} 
-                        onUpdate={up => updateConfig('image', localSettings.imageModels.find(m => m.provider === selectedImage)!.id, up)} 
-                        onDelete={() => deleteConfig('image', localSettings.imageModels.find(m => m.provider === selectedImage)!.id)} 
-                        onSetVerified={v => updateConfig('image', localSettings.imageModels.find(m => m.provider === selectedImage)!.id, { verified: v })} 
-                        onSetActive={() => setLocalSettings(p => ({ ...p, activeImageModelId: p.imageModels.find(m => m.provider === selectedImage)!.id }))} 
-                        isActiveModel={localSettings.activeImageModelId === localSettings.imageModels.find(m => m.provider === selectedImage)?.id} 
-                    />
-                )}
+                {selectedImage && <ModelConfigEditor t={t} type="image" config={getOrCreateModel('image', IMAGE_PROVIDERS.find(p => p.value === selectedImage)!)} onUpdate={up => updateConfig('image', localSettings.imageModels.find(m => m.provider === selectedImage)!.id, up)} onDelete={() => deleteConfig('image', localSettings.imageModels.find(m => m.provider === selectedImage)!.id)} onSetVerified={v => updateConfig('image', localSettings.imageModels.find(m => m.provider === selectedImage)!.id, { verified: v })} onSetActive={() => setLocalSettings(p => ({ ...p, activeImageModelId: p.imageModels.find(m => m.provider === selectedImage)!.id }))} isActiveModel={localSettings.activeImageModelId === localSettings.imageModels.find(m => m.provider === selectedImage)?.id} />}
             </section>
         </div>
     );

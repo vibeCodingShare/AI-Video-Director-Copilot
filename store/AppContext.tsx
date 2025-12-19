@@ -1,21 +1,16 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Project, AppSettings, Scene, ProjectInput, EditingPlan } from '../types';
+import { Project, AppSettings, Scene, ProjectInput, EditingPlan, ModelConfig } from '../types';
 import { DEFAULT_SETTINGS } from '../constants';
 import { analyzeIntent, generateScript, generateEditingPlan, generateSceneImage } from '../services/gemini';
 import { buildScriptGenerationPrompt, buildEditingPlanPrompt } from '../utils/promptBuilder';
 import { dbService } from '../services/db';
 
 interface TaskState {
-  // Project Creation
   isCreating: boolean;
   creationStatus: 'idle' | 'analyzing' | 'scripting' | 'success';
   creationError: string | null;
-  
-  // Editing Plan Generation (Set of Project IDs)
   generatingEditPlanIds: Set<string>;
-  
-  // Image Generation (Set of "projectId-sceneId" strings)
   generatingImageIds: Set<string>;
 }
 
@@ -23,10 +18,8 @@ interface AppState {
   projects: Project[];
   currentProjectId: string | null;
   settings: AppSettings;
-  taskState: TaskState; // Global Task State
+  taskState: TaskState;
   isLoadingData: boolean;
-  
-  // Actions
   addProject: (project: Project) => void;
   updateProject: (id: string, updates: Partial<Project>) => void;
   updateScene: (projectId: string, sceneId: number, updates: Partial<Scene>) => void;
@@ -35,32 +28,23 @@ interface AppState {
   getCurrentProject: () => Project | undefined;
   deleteProject: (id: string) => void;
   importProjects: (projects: Project[]) => void;
-  
-  // Async Task Launchers
   startProjectCreation: (input: ProjectInput) => Promise<void>;
   resetCreationState: () => void;
   startEditPlanGeneration: (projectId: string) => Promise<void>;
   startSceneImageGeneration: (projectId: string, scene: Scene, styleId: string) => Promise<void>;
-
   storageError: string | null;
 }
 
 const AppContext = createContext<AppState | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // --- Data State ---
   const [projects, setProjects] = useState<Project[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [isLoadingData, setIsLoadingData] = useState(true);
-
-  // --- Session State (Not persisted in DB) ---
   const [currentProjectId, setCurrentProjectIdState] = useState<string | null>(() => {
     return localStorage.getItem('vdc_currentProjectId') || null;
   });
-
   const [storageError, setStorageError] = useState<string | null>(null);
-
-  // --- Global Task State ---
   const [taskState, setTaskState] = useState<TaskState>({
     isCreating: false,
     creationStatus: 'idle',
@@ -69,7 +53,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     generatingImageIds: new Set(),
   });
 
-  // --- Initialization Effect (Load from DB) ---
   useEffect(() => {
     const init = async () => {
       try {
@@ -91,31 +74,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const setCurrentProjectId = (id: string | null) => {
     setCurrentProjectIdState(id);
-    if (id) {
-      localStorage.setItem('vdc_currentProjectId', id);
-    } else {
-      localStorage.removeItem('vdc_currentProjectId');
-    }
+    if (id) localStorage.setItem('vdc_currentProjectId', id);
+    else localStorage.removeItem('vdc_currentProjectId');
   };
 
-  // --- Actions with DB Persistence ---
-
   const addProject = async (project: Project) => {
-    // Optimistic UI update
     setProjects(prev => [project, ...prev]);
     setCurrentProjectId(project.id);
-    // Async DB update
-    try {
-        await dbService.saveProject(project);
-    } catch (e) {
-        setStorageError("Failed to save project to disk.");
-    }
+    try { await dbService.saveProject(project); } catch (e) { setStorageError("Failed to save project."); }
   };
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
-    // Find project to update for DB write
     let updatedProjectFull: Project | undefined;
-
     setProjects(prev => prev.map(p => {
         if (p.id === id) {
             updatedProjectFull = { ...p, ...updates };
@@ -123,118 +93,59 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
         return p;
     }));
-
     if (updatedProjectFull) {
-        try {
-            await dbService.saveProject(updatedProjectFull);
-        } catch (e) {
-            console.error(e);
-            setStorageError("Failed to save changes.");
-        }
+        try { await dbService.saveProject(updatedProjectFull); } catch (e) { setStorageError("Failed to save project."); }
     }
   };
 
   const updateScene = async (projectId: string, sceneId: number, updates: Partial<Scene>) => {
     let updatedProjectFull: Project | undefined;
-
     setProjects(prev => prev.map(p => {
       if (p.id !== projectId || !p.data) return p;
       const newScenes = p.data.scenes.map(s => s.id === sceneId ? { ...s, ...updates } : s);
       updatedProjectFull = { ...p, data: { ...p.data, scenes: newScenes } };
       return updatedProjectFull;
     }));
-
     if (updatedProjectFull) {
-        try {
-            await dbService.saveProject(updatedProjectFull);
-        } catch (e) {
-            console.error(e);
-            setStorageError("Failed to save scene changes.");
-        }
+        try { await dbService.saveProject(updatedProjectFull); } catch (e) { setStorageError("Failed to save scene."); }
     }
   };
 
   const deleteProject = async (id: string) => {
     setProjects(prev => prev.filter(p => p.id !== id));
     if (currentProjectId === id) setCurrentProjectId(null);
-    try {
-        await dbService.deleteProject(id);
-    } catch (e) {
-        console.error(e);
-    }
+    try { await dbService.deleteProject(id); } catch (e) { console.error(e); }
   };
 
   const updateSettings = async (newSettings: AppSettings) => {
     setSettings(newSettings);
-    try {
-        await dbService.saveSettings(newSettings);
-    } catch (e) {
-        console.error(e);
-        setStorageError("Failed to save settings.");
-    }
+    try { await dbService.saveSettings(newSettings); } catch (e) { setStorageError("Failed to save settings."); }
   };
 
   const getCurrentProject = () => projects.find(p => p.id === currentProjectId);
 
   const importProjects = async (importedProjects: Project[]) => {
-    if (!Array.isArray(importedProjects)) {
-      alert("Invalid backup file format.");
-      return;
-    }
-    
     try {
         await dbService.importProjects(importedProjects);
-        // Reload from DB to ensure consistency
         const freshProjects = await dbService.getAllProjects();
         setProjects(freshProjects);
-
-        alert(`Import Successful! ${importedProjects.length} projects processed.`);
-        
-        if (!currentProjectId && freshProjects.length > 0) {
-            setCurrentProjectId(freshProjects[0].id);
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Database import failed.");
-    }
+        if (!currentProjectId && freshProjects.length > 0) setCurrentProjectId(freshProjects[0].id);
+    } catch (e) { console.error(e); }
   };
-
-  // --- Async Task Actions ---
 
   const startSceneImageGeneration = async (projectId: string, scene: Scene, styleId: string) => {
     const key = `${projectId}-${scene.id}`;
-    
     setTaskState(prev => {
         const newSet = new Set(prev.generatingImageIds);
         newSet.add(key);
         return { ...prev, generatingImageIds: newSet };
     });
-
     try {
        const styleTemplate = settings.imageStyleTemplates.find(t => t.id === styleId);
        const stylePrompt = styleTemplate ? styleTemplate.prompt : "Photorealistic";
-       
-       const imageUrl = await generateSceneImage(
-         scene.image_prompt,
-         scene.visual_spec.description,
-         stylePrompt,
-         settings
-       );
-
-       await updateScene(projectId, scene.id, {
-           generated_image_url: imageUrl,
-           image_style_preset: styleId
-       });
-
-    } catch (e: any) {
-        if (e.message && e.message.includes("No active image model")) {
-            // We alert here only if initiated manually. For batch processing, we might want to be quieter or handle it differently, 
-            // but for now, the alert works to notify missing config.
-            console.error("Missing Image Model Config");
-        } else {
-            console.error("Image Gen Failed:", e);
-        }
-    } finally {
+       const imageUrl = await generateSceneImage(scene.image_prompt, scene.visual_spec.description, stylePrompt, settings);
+       await updateScene(projectId, scene.id, { generated_image_url: imageUrl, image_style_preset: styleId });
+    } catch (e) { console.error("Image Gen Failed:", e); } finally {
         setTaskState(prev => {
             const newSet = new Set(prev.generatingImageIds);
             newSet.delete(key);
@@ -243,87 +154,43 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  // Helper for sequential batch processing with rate limiting
   const processImageBatch = async (projectId: string, scenes: Scene[], styleId: string) => {
-    console.log(`Starting batch image generation for project ${projectId}. Total scenes: ${scenes.length}`);
-    
-    // Serial Execution Loop
     for (const scene of scenes) {
-        // Skip if already has image (unlikely for new project, but good practice)
         if (scene.generated_image_url) continue;
-
-        // Trigger generation
         await startSceneImageGeneration(projectId, scene, styleId);
-        
-        // Rate Limiting Delay (2 seconds) to avoid 429 errors
         await new Promise(resolve => setTimeout(resolve, 2000));
     }
-    console.log(`Batch image generation completed for project ${projectId}`);
   };
 
   const startProjectCreation = async (input: ProjectInput) => {
     if (taskState.isCreating) return;
-
     setTaskState(prev => ({ ...prev, isCreating: true, creationStatus: 'analyzing', creationError: null }));
-
     try {
-      // 1. Intent Analysis
       let finalContent = input.rawContent;
       if (settings.enableIntentAnalysis) {
-        try {
-          finalContent = await analyzeIntent(input.rawContent, settings);
-        } catch (e) {
-          console.error("Intent analysis failed silently", e);
-        }
+        try { finalContent = await analyzeIntent(input.rawContent, settings); } catch (e) { console.error(e); }
       }
-
-      // 2. Script Generation
       setTaskState(prev => ({ ...prev, creationStatus: 'scripting' }));
-      
       const processingInput = { ...input, rawContent: finalContent };
       const prompt = buildScriptGenerationPrompt(processingInput);
       const scriptData = await generateScript(prompt, settings);
-      
-      // Post-process
       if (input.initialStyleId) {
-          scriptData.scenes = scriptData.scenes.map(scene => ({
-              ...scene,
-              image_style_preset: input.initialStyleId
-          }));
+          scriptData.scenes = scriptData.scenes.map(scene => ({ ...scene, image_style_preset: input.initialStyleId }));
       }
-
-      const newProject: Project = {
-        ...input,
-        id: crypto.randomUUID(),
-        createdAt: Date.now(),
-        data: scriptData
-      };
-
+      const newProject: Project = { ...input, id: crypto.randomUUID(), createdAt: Date.now(), data: scriptData };
       await addProject(newProject);
       setTaskState(prev => ({ ...prev, isCreating: false, creationStatus: 'success' }));
-
-      // 3. Auto-Generate Images (Fire and Forget - Background Task)
       if (settings.autoGenerateImageOnScript && scriptData.scenes.length > 0) {
           const styleId = input.initialStyleId || settings.imageStyleTemplates[0]?.id || 'cinematic';
-          // We call this without awaiting so the UI unblocks immediately
           processImageBatch(newProject.id, scriptData.scenes, styleId);
       }
-
     } catch (err: any) {
-      console.error(err);
-      setTaskState(prev => ({ 
-        ...prev, 
-        isCreating: false, 
-        creationStatus: 'idle', 
-        creationError: err.message || "Failed to generate project" 
-      }));
-      alert(`Error: ${err.message || 'Unknown error'}`);
+      setTaskState(prev => ({ ...prev, isCreating: false, creationStatus: 'idle', creationError: err.message || "Failed" }));
+      alert(`Error: ${err.message}`);
     }
   };
 
-  const resetCreationState = () => {
-    setTaskState(prev => ({ ...prev, creationStatus: 'idle', creationError: null }));
-  };
+  const resetCreationState = () => setTaskState(prev => ({ ...prev, creationStatus: 'idle', creationError: null }));
 
   const startEditPlanGeneration = async (projectId: string) => {
     setTaskState(prev => {
@@ -331,24 +198,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         newSet.add(projectId);
         return { ...prev, generatingEditPlanIds: newSet };
     });
-
     try {
       const project = projects.find(p => p.id === projectId);
-      if (!project || !project.data) throw new Error("Project data missing");
-
-      // Cleanse data to save tokens
+      if (!project || !project.data) throw new Error("Missing data");
       const cleanScenes = project.data.scenes.map(({ generated_image_url, ...rest }) => rest);
-      const cleanProjectData = { ...project.data, scenes: cleanScenes };
-
-      const prompt = buildEditingPlanPrompt(cleanProjectData);
+      const prompt = buildEditingPlanPrompt({ ...project.data, scenes: cleanScenes });
       const plan = await generateEditingPlan(prompt, settings);
-      
       await updateProject(projectId, { editingPlan: plan });
-
-    } catch (e: any) {
-      console.error(e);
-      alert("Failed to generate editing plan.");
-    } finally {
+    } catch (e) { alert("Failed to generate plan."); } finally {
         setTaskState(prev => {
             const newSet = new Set(prev.generatingEditPlanIds);
             newSet.delete(projectId);
@@ -359,30 +216,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   return (
     <AppContext.Provider value={{
-      projects,
-      currentProjectId,
-      settings,
-      storageError,
-      taskState,
-      isLoadingData,
-      addProject,
-      updateProject,
-      updateScene,
-      setCurrentProjectId,
-      updateSettings,
-      getCurrentProject,
-      deleteProject,
-      importProjects,
-      startProjectCreation,
-      resetCreationState,
-      startEditPlanGeneration,
-      startSceneImageGeneration
+      projects, currentProjectId, settings, storageError, taskState, isLoadingData,
+      addProject, updateProject, updateScene, setCurrentProjectId, updateSettings,
+      getCurrentProject, deleteProject, importProjects, startProjectCreation,
+      resetCreationState, startEditPlanGeneration, startSceneImageGeneration
     }}>
-      {isLoadingData ? (
-          <div className="h-screen w-full flex items-center justify-center bg-background text-gray-500">
-              Loading Database...
-          </div>
-      ) : children}
+      {isLoadingData ? <div className="h-screen w-full flex items-center justify-center bg-background text-gray-500">Loading Database...</div> : children}
     </AppContext.Provider>
   );
 };

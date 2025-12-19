@@ -5,7 +5,6 @@ import { callOpenAICompatible, callOpenAICompatibleImageGen } from './providers/
 import { callJimengVisualGen } from './providers/jimeng';
 import { callKlingImageGen } from './providers/kling';
 import { callAnthropicText } from './providers/anthropic';
-import { callQianwenImageGen } from './providers/qianwen';
 
 // --- CONFIG HELPERS ---
 
@@ -89,8 +88,6 @@ export const generateSceneImage = async (
         return await callJimengVisualGen(config, fullPrompt);
       case 'kling':
         return await callKlingImageGen(config, fullPrompt);
-      case 'qianwen':
-        return await callQianwenImageGen(config, fullPrompt);
       case 'openai-compatible':
       default:
         return await callOpenAICompatibleImageGen(config, fullPrompt);
