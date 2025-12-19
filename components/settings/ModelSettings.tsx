@@ -1,11 +1,13 @@
+
 import React, { useState } from 'react';
-import { Cpu, Image as ImageIcon, CheckCircle, Zap, Key, Shield, Globe, RotateCcw, Trash2, AlertCircle } from 'lucide-react';
+import { Cpu, Image as ImageIcon, CheckCircle, Zap, Key, Shield, Globe, RotateCcw, Trash2, AlertCircle, ChevronDown, Info, ShieldAlert, ExternalLink } from 'lucide-react';
 import { AppSettings, ModelConfig, ModelProvider } from '../../types';
 import { callGoogleGenAI, callGoogleImageGen } from '../../services/providers/google';
 import { callAnthropicText } from '../../services/providers/anthropic';
 import { callOpenAICompatible, callOpenAICompatibleImageGen } from '../../services/providers/openai';
 import { callJimengVisualGen } from '../../services/providers/jimeng';
 import { callKlingImageGen } from '../../services/providers/kling';
+import { callQianwenImageGen } from '../../services/providers/qianwen';
 
 interface ProviderPreset {
     value: ModelProvider;
@@ -28,10 +30,24 @@ const TEXT_PROVIDERS: ProviderPreset[] = [
 
 const IMAGE_PROVIDERS: ProviderPreset[] = [
     { value: 'google', label: 'Google Gemini', defaultModelId: 'gemini-2.5-flash-image', desc: 'Native Image Gen' },
+    { value: 'qianwen', label: 'Qwen (通义万相)', defaultBaseUrl: 'https://dashscope.aliyuncs.com/api/v1', defaultModelId: 'wan2.6-t2i', desc: 'High Quality Generation' },
     { value: 'jimeng', label: 'Jimeng (即梦)', defaultBaseUrl: 'https://visual.volcengineapi.com', defaultModelId: 'jimeng_t2i_v40', desc: 'Cinematic Quality' },
-    { value: 'kling', label: 'Kling AI (可灵)', defaultBaseUrl: 'https://api.klingai.com/v1', defaultModelId: 'kling-v1', desc: 'Professional Visuals' },
+    { value: 'kling', label: 'Kling AI (可灵)', defaultBaseUrl: 'https://api-beijing.klingai.com', defaultModelId: 'kling-v1', desc: 'Professional Visuals' },
     { value: 'openai-compatible', label: 'DALL-E / Generic', defaultBaseUrl: 'https://api.openai.com/v1', defaultModelId: 'dall-e-3', desc: 'Standard Image API' },
 ];
+
+const MODEL_ID_PRESETS: Record<ModelProvider, string[]> = {
+    'google': ['gemini-3-flash-preview', 'gemini-3-pro-preview', 'gemini-3-pro-image-preview', 'gemini-2.5-flash-image'],
+    'kling': ['kling-image-o1', 'kling-v2-1', 'kling-v2', 'kling-v1-5', 'kling-v1', 'kling-v2-new'],
+    'jimeng': ['jimeng_t2i_v40', 'jimeng_t2i_v35', 'jimeng_t2i_v30'],
+    'qianwen': ['wan2.6-t2i', 'wan2.5-t2i-preview', 'wan2.2-t2i-plus', 'qwen-image-plus'],
+    'deepseek': ['deepseek-chat', 'deepseek-reasoner'],
+    'claude': ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest', 'claude-3-opus-latest'],
+    'openai-compatible': ['gpt-4o', 'gpt-4o-mini', 'dall-e-3', 'dall-e-2'],
+    'moonshot': ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+    'minimax': ['abab6.5s-chat', 'abab6.5-chat'],
+    'grok': ['grok-beta', 'grok-2'],
+};
 
 interface ModelSettingsProps {
     localSettings: AppSettings;
@@ -71,11 +87,11 @@ const ModelConfigEditor: React.FC<{
                 if (config.provider === 'google') {
                     await callGoogleImageGen(config, "A single red cube");
                 } else if (config.provider === 'jimeng') {
-                    // 直接调用服务函数，不再拦截报错
                     await callJimengVisualGen(config, "A single red cube");
                 } else if (config.provider === 'kling') {
-                    // 直接调用服务函数，不再拦截报错
                     await callKlingImageGen(config, "A single red cube");
+                } else if (config.provider === 'qianwen') {
+                    await callQianwenImageGen(config, "A single red cube");
                 } else if (config.provider === 'openai-compatible') {
                     await callOpenAICompatibleImageGen(config, "A single red cube");
                 } else {
@@ -94,6 +110,7 @@ const ModelConfigEditor: React.FC<{
 
     const isAkSk = config.provider === 'kling' || config.provider === 'jimeng';
     const isReady = isModelConfigured(config);
+    const presets = MODEL_ID_PRESETS[config.provider] || [];
 
     return (
         <div className="bg-surface border border-gray-800 rounded-xl p-6 animate-in fade-in slide-in-from-top-2 shadow-2xl">
@@ -128,10 +145,33 @@ const ModelConfigEditor: React.FC<{
                     <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.displayName}</label>
                     <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none" value={config.name} onChange={e => onUpdate({ name: e.target.value })} />
                 </div>
-                <div>
+                
+                <div className="col-span-1 md:col-span-2">
                     <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.modelId}</label>
-                    <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none font-mono" value={config.modelId} onChange={e => onUpdate({ modelId: e.target.value, verified: false })} />
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <input 
+                                className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 text-sm text-white focus:border-primary outline-none font-mono" 
+                                value={config.modelId} 
+                                onChange={e => onUpdate({ modelId: e.target.value, verified: false })} 
+                            />
+                        </div>
+                        {presets.length > 0 && (
+                            <div className="relative">
+                                <select 
+                                    className="h-full bg-gray-800 border border-gray-700 rounded-lg px-3 text-xs text-gray-300 font-bold focus:border-primary outline-none appearance-none pr-8 cursor-pointer"
+                                    value=""
+                                    onChange={(e) => e.target.value && onUpdate({ modelId: e.target.value, verified: false })}
+                                >
+                                    <option value="" disabled>选择预设</option>
+                                    {presets.map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+                            </div>
+                        )}
+                    </div>
                 </div>
+
                 {isAkSk ? (
                     <>
                          <div>
@@ -158,13 +198,46 @@ const ModelConfigEditor: React.FC<{
                          </div>
                     </div>
                 )}
+                
                 {config.provider !== 'google' && (
                      <div className="col-span-1 md:col-span-2">
                         <label className="text-xs text-gray-500 font-bold uppercase mb-1.5 block">{t.settings.modelEditor.baseUrl}</label>
                         <div className="relative">
                             <Globe size={14} className="absolute left-3 top-3.5 text-gray-600" />
-                            <input className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-gray-300 focus:border-primary outline-none font-mono" value={config.baseUrl || ''} placeholder="https://api.yourprovider.com/v1" onChange={e => onUpdate({ baseUrl: e.target.value, verified: false })} />
+                            <input 
+                                className="w-full bg-black/50 border border-gray-800 rounded-lg p-3 pl-10 text-sm text-gray-300 focus:border-primary outline-none font-mono" 
+                                value={config.baseUrl || ''} 
+                                placeholder={config.provider === 'kling' ? 'https://api-beijing.klingai.com' : 'https://api.yourprovider.com/v1'} 
+                                onChange={e => onUpdate({ baseUrl: e.target.value, verified: false })} 
+                            />
                         </div>
+                        
+                        {config.provider === 'kling' && (
+                            <div className="mt-4 p-4 bg-amber-900/10 border border-amber-900/30 rounded-xl space-y-4">
+                                <h4 className="text-[11px] font-bold text-amber-500 uppercase flex items-center gap-2">
+                                    <ShieldAlert size={14} /> 跨域 (CORS) 与 401 彻底解决
+                                </h4>
+                                <div className="text-[10px] text-gray-400 leading-relaxed space-y-3">
+                                    <div className="p-2 bg-black/40 rounded-lg border border-amber-900/20">
+                                        <p className="font-bold text-gray-200 mb-1">1. 跨域拦截解决</p>
+                                        <p>可灵 API 不允许浏览器直连。请修改 Base URL，在地址前增加跨域代理前缀：</p>
+                                        <code className="text-white block mt-1 bg-black p-1 rounded break-all">https://cors-anywhere.herokuapp.com/https://api-beijing.klingai.com</code>
+                                        <p className="mt-1 italic opacity-70">注：首次使用代理需访问 herokuapp 官网并点击 "Get temporary access"。</p>
+                                    </div>
+                                    <div className="p-2 bg-black/40 rounded-lg border border-amber-900/20">
+                                        <p className="font-bold text-gray-200 mb-1">2. 解决 401 Unauthorized</p>
+                                        <p>若遇到 401，请确认 AK/SK 无误且无多余空格。本系统已严格按照官方 JWT 标准（iss, exp, nbf）实现。</p>
+                                    </div>
+                                    <div className="p-2 bg-black/40 rounded-lg border border-amber-900/20">
+                                        <p className="font-bold text-gray-200 mb-1">3. 默认域名建议</p>
+                                        <p>国内集群请优先使用：<code className="text-white">https://api-beijing.klingai.com</code></p>
+                                    </div>
+                                </div>
+                                <a href="https://app.klingai.com/cn/dev/document-api/apiReference/commonInfo" target="_blank" className="inline-flex items-center gap-1 text-[10px] text-primary font-bold hover:underline">
+                                    查看可灵官方文档 <ExternalLink size={10} />
+                                </a>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -286,13 +359,6 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
                         <Cpu size={24} className="text-blue-400" /> {t.settings.llmModels}
                     </h2>
                     <p className="text-gray-500 text-sm mt-1">Configure language models for scriptwriting and creative direction.</p>
-                    <div className="mt-3">
-                        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 max-w-4xl">
-                            <p className="text-gray-300 text-xs leading-relaxed">
-                                💡 <span className="font-semibold">提示：</span>使用更强的基础模型可以获得更明显的效果提升
-                            </p>
-                        </div>
-                    </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                     {TEXT_PROVIDERS.map(p => {
@@ -332,13 +398,6 @@ const ModelSettings: React.FC<ModelSettingsProps> = ({ localSettings, setLocalSe
                         <ImageIcon size={24} className="text-pink-400" /> {t.settings.imgModels}
                     </h2>
                     <p className="text-gray-500 text-sm mt-1">Configure AI image generators for your storyboard visuals.</p>
-                    <div className="mt-3">
-                        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 max-w-4xl">
-                            <p className="text-gray-300 text-xs leading-relaxed">
-                                💡 <span className="font-semibold">提示：</span>使用更强的基础模型可以获得更明显的效果提升
-                            </p>
-                        </div>
-                    </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
                     {IMAGE_PROVIDERS.map(p => {

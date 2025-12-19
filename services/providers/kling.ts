@@ -1,134 +1,158 @@
 
 import { ModelConfig } from '../../types';
 
-// --- JWT HELPERS ---
-
-const base64UrlEncode = (str: string): string => {
-    return btoa(str)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+/**
+ * 严格对齐 Python pyjwt 的 Base64Url 编码
+ */
+const base64UrlEncode = (input: Uint8Array | string): string => {
+  let binary = '';
+  if (typeof input === 'string') {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(input);
+    bytes.forEach(b => binary += String.fromCharCode(b));
+  } else {
+    input.forEach(b => binary += String.fromCharCode(b));
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 };
 
-const base64UrlEncodeArray = (buffer: ArrayBuffer): string => {
-    return btoa(String.fromCharCode(...new Uint8Array(buffer)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
-};
-
+/**
+ * 生成可灵 API JWT Token
+ * 严格遵循官方提供的 Python 示例结构
+ */
 const generateKlingToken = async (accessKey: string, secretKey: string): Promise<string> => {
-    const header = {
-        alg: "HS256",
-        typ: "JWT"
-    };
+  // 1. Header
+  const header = {
+    alg: "HS256",
+    typ: "JWT"
+  };
 
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-        iss: accessKey,
-        exp: now + 1800, 
-        nbf: now - 5    
-    };
+  // 2. Payload (对齐 Python 示例的时间戳处理)
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: accessKey,
+    exp: now + 1800, // 30分钟后过期
+    nbf: now - 60,   // 1分钟前生效，防止服务器时钟同步微差导致的 401
+    iat: now         // 签发时间
+  };
 
-    const encodedHeader = base64UrlEncode(JSON.stringify(header));
-    const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-    const dataToSign = `${encodedHeader}.${encodedPayload}`;
+  const encodedHeader = base64UrlEncode(JSON.stringify(header));
+  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
 
-    const enc = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-        "raw",
-        enc.encode(secretKey),
-        { name: "HMAC", hash: "SHA-256" },
-        false,
-        ["sign"]
-    );
+  // 3. Signature (HMAC-SHA256)
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(secretKey),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
 
-    const signature = await crypto.subtle.sign(
-        "HMAC",
-        key,
-        enc.encode(dataToSign)
-    );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(unsignedToken)
+  );
 
-    const encodedSignature = base64UrlEncodeArray(signature);
-    return `${dataToSign}.${encodedSignature}`;
+  const encodedSignature = base64UrlEncode(new Uint8Array(signature));
+  return `${unsignedToken}.${encodedSignature}`;
 };
-
-// --- MAIN API CALL ---
 
 export const callKlingImageGen = async (config: ModelConfig, prompt: string): Promise<string> => {
-    if (!config.accessKey || !config.secretKey) {
-        throw new Error(`Access Key and Secret Key are required for Kling AI`);
-    }
-    
-    // Generate JWT Token on the fly
-    const token = await generateKlingToken(config.accessKey, config.secretKey);
+  if (!config.accessKey || !config.secretKey) {
+    throw new Error(`[配置错误] 可灵 AI 需要 Access Key 和 Secret Key。`);
+  }
 
-    const baseUrl = config.baseUrl?.replace(/\/+$/, '') || 'https://api.klingai.com/v1';
+  const token = await generateKlingToken(config.accessKey, config.secretKey);
   
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
+  // 默认使用北京集群
+  let baseUrl = config.baseUrl?.trim() || 'https://api-beijing.klingai.com';
   
-    // 1. Submit Task
-    const submitRes = await fetch(`${baseUrl}/images/generations`, {
+  // 路径自动修正逻辑
+  const sanitizedBaseUrl = baseUrl.replace(/\/+$/, '');
+  const apiUrl = sanitizedBaseUrl.includes('/v1') 
+    ? `${sanitizedBaseUrl}/images/generations` 
+    : `${sanitizedBaseUrl}/v1/images/generations`;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  };
+
+  const body = {
+    model: config.modelId || 'kling-v1',
+    prompt,
+    n: 1,
+    aspect_ratio: "1:1"
+  };
+
+  try {
+    // --- 阶段 1: 任务提交 ---
+    const submitRes = await fetch(apiUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model: config.modelId || 'kling-v1',
-        prompt: prompt,
-        n: 1
-      })
+      body: JSON.stringify(body)
     });
-  
+
     if (!submitRes.ok) {
-       const txt = await submitRes.text();
-       throw new Error(`Kling Submit Failed: ${txt}`);
+      const errorText = await submitRes.text();
+      if (submitRes.status === 401) {
+        throw new Error(`[401 鉴权失败] Token 被拒绝。请确认 Secret Key 无误。如果使用了跨域代理，请确认代理未修改 Authorization 头。`);
+      }
+      if (submitRes.status === 404) {
+        throw new Error(`[404 路径错误] 请检查 Base URL。当前请求地址: ${apiUrl}`);
+      }
+      throw new Error(`可灵请求失败 (HTTP ${submitRes.status}): ${errorText}`);
     }
-  
+
     const submitData = await submitRes.json();
-    
-    // Check if it returned image directly (Standard/Sync mode fallback)
-    if (submitData.data && Array.isArray(submitData.data) && (submitData.data[0]?.url || submitData.data[0]?.b64_json)) {
-        if (submitData.data[0].b64_json) return `data:image/png;base64,${submitData.data[0].b64_json}`;
-        return submitData.data[0].url;
+    if (submitData.code !== 0) {
+      throw new Error(`[可灵业务错误 ${submitData.code}] ${submitData.message}`);
     }
-    
-    // Async Task Flow
-    const taskId = submitData.data?.task_id || submitData.task_id;
-    if (!taskId) {
-        console.error("Kling Response:", submitData);
-        throw new Error(`No task_id or image data found in Kling response.`);
-    }
-  
-    // 2. Poll Status
+
+    const taskId = submitData.data?.task_id;
+    if (!taskId) throw new Error("未获取到任务 ID");
+
+    // --- 阶段 2: 轮询结果 ---
     let attempts = 0;
-    const MAX_ATTEMPTS = 45; // 90 seconds max
-    
-    while (attempts < MAX_ATTEMPTS) {
-        await new Promise(r => setTimeout(r, 2000));
-        attempts++;
-  
-        const checkRes = await fetch(`${baseUrl}/images/generations/${taskId}`, {
-            headers
-        });
-        
-        if (!checkRes.ok) continue;
-  
-        const checkData = await checkRes.json();
-        const statusData = checkData.data || checkData; 
-        const status = statusData.task_status || statusData.status;
-        
-        if (status === 'succeed' || status === 'completed' || status === 'success') {
-            const result = statusData.task_result || statusData.result;
-            const images = result?.images;
-            if (images && images[0]?.url) {
-                return images[0].url;
-            }
-        } else if (status === 'failed' || status === 'failure') {
-            throw new Error(`Kling Task Failed: ${statusData.task_status_msg || 'Unknown error'}`);
-        }
+    const maxAttempts = 50;
+    while (attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 4000));
+      attempts++;
+
+      // 轮询也要带 Token
+      const pollUrl = `${apiUrl}/${taskId}`;
+      const pollRes = await fetch(pollUrl, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!pollRes.ok) continue;
+
+      const pollData = await pollRes.json();
+      const task = pollData.data;
+
+      if (task?.task_status === 'succeed' || task?.task_status === 'completed') {
+        const url = task.task_result?.images?.[0]?.url;
+        if (url) return url;
+      }
+
+      if (task?.task_status === 'failed') {
+        throw new Error(`[生成失败] ${task.task_status_msg || '任务被系统终止'}`);
+      }
     }
-  
-    throw new Error("Kling Generation Timed Out");
+
+    throw new Error("可灵任务生成超时（约 3 分钟）");
+  } catch (err: any) {
+    // 专门处理浏览器 CORS 拦截导致的 TypeError
+    if (err.name === 'TypeError' && !apiUrl.includes('cors')) {
+      throw new Error(`[CORS 跨域拦截] 浏览器安全策略阻止了直接请求。解决办法：请在 Base URL 前加上 'https://cors-anywhere.herokuapp.com/' 代理。`);
+    }
+    throw err;
+  }
 };

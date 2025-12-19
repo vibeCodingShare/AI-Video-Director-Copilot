@@ -59,15 +59,6 @@ const PromptSettings: React.FC<PromptSettingsProps> = ({ localSettings, setLocal
                 </button>
             </div>
 
-            {/* Tip Banner */}
-            <div className="px-4 md:px-8 pt-4">
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 max-w-5xl">
-                    <p className="text-gray-300 text-xs leading-relaxed">
-                        💡 <span className="font-semibold">提示：</span>你可以定制属于自己的工作流或者想要的导演和剪辑风格，使用更加专业的 prompt 来获得效果提升和预期产出
-                    </p>
-                </div>
-            </div>
-
             {/* Content Area */}
             <div className="px-4 md:px-8 py-8">
                 
